@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt
@@ -14,19 +15,28 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rodall_signage.player.mpv_controller import MpvController
+from rodall_signage.context import AppContext
+from rodall_signage.models import AppState
+from rodall_signage.player.mpv_models import MpvEvent
+
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, media_path: Path | None, windowed: bool) -> None:
+    def __init__(
+        self,
+        context: AppContext,
+        media_path: Path | None,
+    ) -> None:
         super().__init__()
 
+        self._context = context
         self._media_path = media_path
-        self._windowed = windowed
         self._player_started = False
-        self._player = MpvController(self)
+        self._allow_close = False
 
-        self.setWindowTitle("RodallTV Signage Prototype")
+        self.setWindowTitle(context.settings.app_name)
         self.setMinimumSize(960, 540)
         self.setStyleSheet(self._build_stylesheet())
 
@@ -40,11 +50,14 @@ class MainWindow(QMainWindow):
         root_layout.setSpacing(0)
 
         self._rates_bar = QLabel(
-            "TASAS DEL DÍA     USD / MXN --.--     EUR / MXN --.--     GBP / MXN --.--"
+            "TASAS DEL DÍA     USD / MXN --.--     "
+            "EUR / MXN --.--     GBP / MXN --.--"
         )
         self._rates_bar.setObjectName("ratesBar")
         self._rates_bar.setFixedHeight(42)
-        self._rates_bar.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        self._rates_bar.setAlignment(
+            Qt.AlignVCenter | Qt.AlignLeft
+        )
 
         content = QWidget()
         content_layout = QHBoxLayout(content)
@@ -74,12 +87,16 @@ class MainWindow(QMainWindow):
         weather_layout = QVBoxLayout(weather_card)
         weather_layout.addWidget(self._title("Veracruz, VER"))
         weather_layout.addWidget(self._value("--°C"))
-        weather_layout.addWidget(self._body("Sin información del clima"))
+        weather_layout.addWidget(
+            self._body("Sin información del clima")
+        )
 
         references_card = QFrame()
         references_card.setObjectName("card")
         references_layout = QVBoxLayout(references_card)
-        references_layout.addWidget(self._title("REFERENCIAS DEL DÍA"))
+        references_layout.addWidget(
+            self._title("REFERENCIAS DEL DÍA")
+        )
         references_layout.addWidget(
             self._body(
                 "REF-0001  Referencia de demostración\n\n"
@@ -95,7 +112,7 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._video_frame, 1)
         content_layout.addWidget(side_panel, 0)
 
-        self._status_label = QLabel("Preparando mpv...")
+        self._status_label = QLabel("Preparando aplicación...")
         self._status_label.setObjectName("statusBar")
         self._status_label.setFixedHeight(28)
 
@@ -106,9 +123,32 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
 
     def _connect_signals(self) -> None:
-        self._player.ready.connect(self._on_player_ready)
-        self._player.error_occurred.connect(self._show_error)
-        self._player.playback_event.connect(self._on_playback_event)
+        self._context.player.ready.connect(
+            self._on_player_ready
+        )
+        self._context.player.error_occurred.connect(
+            self._on_player_error
+        )
+        self._context.player.playback_event.connect(
+            self._on_playback_event
+        )
+
+        self._context.event_bus.app_state_changed.connect(
+            self._on_app_state_changed
+        )
+        self._context.event_bus.status_message_changed.connect(
+            self._status_label.setText
+        )
+        self._context.event_bus.fatal_error.connect(
+            self._status_label.setText
+        )
+        self._context.event_bus.shutdown_requested.connect(
+            self._context.lifecycle.shutdown
+        )
+
+        self._context.lifecycle.shutdown_completed.connect(
+            self._complete_close
+        )
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -117,37 +157,65 @@ class MainWindow(QMainWindow):
             return
 
         self._player_started = True
+        self._context.lifecycle.mark_starting()
 
-        # Esperar a que Qt cree el identificador nativo del contenedor.
-        QTimer.singleShot(0, self._start_player)
+        # Requisito validado para Raspberry Pi X11.
+        QTimer.singleShot(250, self._start_player)
 
     def closeEvent(self, event: QCloseEvent) -> None:
-        self._status_label.setText("Cerrando mpv...")
-        self._player.stop()
-        event.accept()
+        if self._allow_close:
+            event.accept()
+            return
+
+        event.ignore()
+        self._context.lifecycle.shutdown()
 
     def _start_player(self) -> None:
         window_id = int(self._video_frame.winId())
-        self._player.start(window_id)
+
+        if window_id <= 0:
+            self._on_player_error(
+                "Qt no generó un identificador válido."
+            )
+            return
+
+        logger.info("Widget multimedia listo. winId=%s", window_id)
+        self._context.player.start(window_id)
 
     def _on_player_ready(self) -> None:
-        self._status_label.setText("mpv conectado mediante JSON IPC.")
+        self._context.lifecycle.mark_ready()
 
         if self._media_path is not None:
-            self._player.load(self._media_path)
+            self._context.player.load(self._media_path)
 
-    def _on_playback_event(self, event: dict) -> None:
-        if event.get("event") == "property-change" and event.get("name") == "path":
-            current_path = event.get("data")
-            if current_path:
-                self._status_label.setText(f"Reproduciendo: {current_path}")
+    def _on_playback_event(self, event: MpvEvent) -> None:
+        raw = event.raw or {}
 
-        if event.get("event") == "end-file":
-            self._status_label.setText("El archivo terminó.")
+        if (
+            event.name == "property-change"
+            and raw.get("name") == "path"
+            and event.data
+        ):
+            self._context.event_bus.publish_status(
+                f"Reproduciendo: {event.data}"
+            )
 
-    def _show_error(self, message: str) -> None:
-        self._status_label.setText(message)
-        print(f"[RodallTV] {message}")
+        if event.name == "end-file":
+            self._context.event_bus.publish_status(
+                "El archivo terminó."
+            )
+
+    def _on_player_error(self, message: str) -> None:
+        self._context.lifecycle.mark_degraded(message)
+
+    def _on_app_state_changed(self, state: AppState) -> None:
+        self.setProperty("appState", state.value)
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def _complete_close(self) -> None:
+        self._allow_close = True
+        self.close()
 
     @staticmethod
     def _title(text: str) -> QLabel:
@@ -191,33 +259,42 @@ class MainWindow(QMainWindow):
             border: 1px solid #34445f;
         }
 
+        QWidget#sidePanel {
+            background: transparent;
+        }
+
         QFrame#card {
-            background: #0d192c;
-            border: 1px solid #263956;
-            border-radius: 12px;
+            background: #111a2c;
+            border: 1px solid #26334a;
+            border-radius: 8px;
         }
 
         QLabel#cardTitle {
-            color: #afc2df;
-            font-size: 13px;
+            color: #a9b7cc;
+            font-size: 14px;
             font-weight: 700;
         }
 
         QLabel#cardValue {
-            color: white;
-            font-size: 36px;
+            color: #ffffff;
+            font-size: 42px;
             font-weight: 700;
         }
 
         QLabel#cardBody {
-            color: #d4deed;
-            font-size: 13px;
+            color: #dbe7f8;
+            font-size: 15px;
         }
 
         QLabel#statusBar {
-            background: #0b1424;
-            color: #9fb0c8;
-            padding-left: 12px;
+            background: #0d1625;
+            color: #9eb0c9;
             border-top: 1px solid #26334a;
+            padding-left: 12px;
+            font-size: 12px;
+        }
+
+        QMainWindow[appState="Degraded"] QLabel#statusBar {
+            color: #ffd166;
         }
         """

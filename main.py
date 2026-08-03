@@ -1,33 +1,34 @@
 from __future__ import annotations
 
-import argparse
+import importlib.util
+import os
+import sys
 from pathlib import Path
 
-from rodall_signage.app import run
 
+def _ensure_project_python() -> None:
+    if importlib.util.find_spec("PySide6") is not None:
+        return
 
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Prototipo PySide6 + mpv para RodallTV"
+    project_root = Path(__file__).resolve().parent
+    virtualenv_python = project_root / ".venv" / "Scripts" / "python.exe"
+
+    if virtualenv_python.is_file():
+        os.execv(
+            str(virtualenv_python),
+            [str(virtualenv_python), str(Path(__file__).resolve()), *sys.argv[1:]],
+        )
+
+    raise RuntimeError(
+        "PySide6 no está instalado y no existe signage-app/.venv. "
+        "Crea el entorno virtual e instala requirements-dev.txt."
     )
-    parser.add_argument(
-        "--media",
-        type=Path,
-        default=None,
-        help="Ruta de una imagen o video local para reproducir.",
-    )
-    parser.add_argument(
-        "--windowed",
-        action="store_true",
-        help="Ejecuta el prototipo en una ventana redimensionable.",
-    )
-    return parser.parse_args()
 
 
-def main() -> int:
-    arguments = parse_arguments()
-    return run(media_path=arguments.media, windowed=arguments.windowed)
+_ensure_project_python()
+
+from rodall_signage.app import run  # noqa: E402
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())
