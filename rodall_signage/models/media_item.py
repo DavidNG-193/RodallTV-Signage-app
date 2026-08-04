@@ -17,11 +17,11 @@ class MediaItem:
     kind: MediaKind
     duration_seconds: int | None = None
 
-    def validate(self) -> None:
+    def validate(self, *, require_file: bool = True) -> None:
         if not self.id.strip():
             raise ValueError("MediaItem.id es obligatorio.")
 
-        if not self.path.is_file():
+        if require_file and not self.path.is_file():
             raise ValueError(f"No existe el archivo multimedia: {self.path}")
 
         if (

@@ -1,0 +1,25 @@
+{
+  "id": "playlist-demo-01",
+  "name": "Playlist de demostración",
+  "version": 1,
+  "items": [
+    {
+      "id": "item-01",
+      "path": "../test-media/RodallTV1.png",
+      "kind": "Image",
+      "durationSeconds": 10
+    },
+    {
+      "id": "item-02",
+      "path": "../test-media/RodallTV.mp4",
+      "kind": "Video",
+      "durationSeconds": null
+    },
+    {
+      "id": "item-03",
+      "path": "../test-media/RodallTV2.jpg",
+      "kind": "Image",
+      "durationSeconds": 10
+    }
+  ]
+}

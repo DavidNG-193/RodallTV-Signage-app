@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 from rodall_signage.context import AppContext
 from rodall_signage.models import AppState
 from rodall_signage.player.mpv_models import MpvEvent
+from rodall_signage.player.playback_models import PlaybackSnapshot
 from rodall_signage.services.demo_data_service import DemoDataService
 from rodall_signage.ui.responsive import LayoutMetrics, metrics_for_width
 from rodall_signage.ui.theme import build_stylesheet
@@ -21,7 +22,6 @@ from rodall_signage.ui.widgets import (
     WeatherCard,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -30,11 +30,13 @@ class MainWindow(QMainWindow):
         self,
         context: AppContext,
         media_path: Path | None,
+        playlist_path: Path | None = None,
     ) -> None:
         super().__init__()
 
         self._context = context
         self._media_path = media_path
+        self._playlist_path = playlist_path
         self._player_started = False
         self._allow_close = False
         self._current_metrics: LayoutMetrics | None = None
@@ -91,6 +93,12 @@ class MainWindow(QMainWindow):
         )
         self._context.lifecycle.shutdown_completed.connect(
             self._complete_close
+        )
+        self._context.playback.snapshot_changed.connect(
+            self._on_playback_snapshot
+        )
+        self._context.playback.error_occurred.connect(
+            self._on_playback_error
         )
 
     def _load_demo_data(self) -> None:
@@ -158,10 +166,46 @@ class MainWindow(QMainWindow):
     def _on_player_ready(self) -> None:
         self._context.lifecycle.mark_ready()
 
+        if self._playlist_path is not None:
+            self._load_and_start_playlist()
+            return
+
         if self._media_path is not None:
             self._context.player.load(self._media_path)
 
+    def _load_and_start_playlist(self) -> None:
+        try:
+            playlist = self._context.playlist_loader.load(
+                self._playlist_path
+            )
+            self._context.playback.set_playlist(playlist)
+            self._context.playback.start()
+        except (KeyError, TypeError, ValueError) as error:
+            self._context.lifecycle.mark_degraded(str(error))
+
+    def _on_playback_snapshot(
+        self,
+        snapshot: PlaybackSnapshot,
+    ) -> None:
+        if snapshot.current_item is None:
+            self._context.event_bus.publish_status(snapshot.message)
+            return
+
+        position = (snapshot.current_index or 0) + 1
+
+        self._context.event_bus.publish_status(
+            f"{position}/{snapshot.total_items} — "
+            f"{snapshot.current_item.path.name} — "
+            f"{snapshot.message}"
+        )
+
+    def _on_playback_error(self, message: str) -> None:
+        logger.warning("Error de playlist: %s", message)
+
     def _on_playback_event(self, event: MpvEvent) -> None:
+        if self._context.playback.is_running:
+            return
+
         raw = event.raw or {}
 
         if (
@@ -188,4 +232,4 @@ class MainWindow(QMainWindow):
 
     def _complete_close(self) -> None:
         self._allow_close = True
-        self.close()
+        QTimer.singleShot(0, self.close)

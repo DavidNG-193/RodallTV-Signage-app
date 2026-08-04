@@ -39,6 +39,7 @@ def run() -> int:
     window = MainWindow(
         context=context,
         media_path=media_path,
+        playlist_path=arguments.playlist,
     )
 
     context.lifecycle.shutdown_completed.connect(app.quit)
@@ -75,6 +76,12 @@ def _parse_arguments() -> argparse.Namespace:
         "--windowed",
         action="store_true",
         help="Ejecutar en ventana.",
+    )
+
+    parser.add_argument(
+        "--playlist",
+        type=Path,
+        help="Archivo JSON de playlist local.",
     )
 
     return parser.parse_args()

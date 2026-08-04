@@ -72,13 +72,18 @@ class MpvController(QObject):
             f"--wid={window_id}",
             "--idle=yes",
             "--force-window=yes",
-            "--keep-open=yes",
+            # El coordinador administra el bucle. Mantener un video abierto al
+            # llegar al EOF deja ``pause=yes`` en algunas versiones de mpv
+            # para Raspberry Pi y el segundo ciclo puede quedar negro.
+            "--keep-open=no",
             "--no-terminal",
             "--no-border",
             "--no-osc",
             "--no-input-default-bindings",
             "--cursor-autohide=always",
-            "--image-display-duration=10",
+            # Las imágenes avanzan mediante PlaybackCoordinator; mpv debe
+            # conservarlas hasta recibir el siguiente loadfile.
+            "--image-display-duration=inf",
             "--background=color",
             "--background-color=#101827",
             "--keepaspect=yes",
@@ -112,6 +117,10 @@ class MpvController(QObject):
 
         logger.info("Solicitando reproducción: %s", resolved_path)
         self.send_command(["loadfile", str(resolved_path), "replace"])
+        # ``pause`` es una propiedad global y versiones antiguas de mpv pueden
+        # conservarla después de un EOF. Restablecerla hace repetible cada
+        # vuelta de la playlist, especialmente con decodificación en Raspberry.
+        self.send_command(["set_property", "pause", False])
 
     def send_command(self, command: list[object]) -> None:
         if not self.is_ready:
@@ -193,6 +202,7 @@ class MpvController(QObject):
         self.send_command(["observe_property", 1, "path"])
         self.send_command(["observe_property", 2, "pause"])
         self.send_command(["observe_property", 3, "eof-reached"])
+        self.send_command(["observe_property", 4, "media-title"])
 
     def _read_ipc_messages(self) -> None:
         self._read_buffer += bytes(self._socket.readAll())

@@ -11,7 +11,9 @@ from rodall_signage.context import AppContext
 from rodall_signage.events import AppEventBus
 from rodall_signage.logging_config import configure_logging
 from rodall_signage.player.mpv_controller import MpvController
+from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
+from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 
 
 logger = logging.getLogger(__name__)
@@ -29,15 +31,20 @@ def build_context(settings: AppSettings) -> AppContext:
 
     event_bus = AppEventBus()
     player = MpvController(settings=settings)
+    playback = PlaybackCoordinator(player=player)
+    playlist_loader = LocalPlaylistLoader()
     lifecycle = LifecycleService(
         event_bus=event_bus,
         player=player,
+        playback=playback,
     )
 
     return AppContext(
         settings=settings,
         event_bus=event_bus,
         player=player,
+        playback=playback,
+        playlist_loader=playlist_loader,
         lifecycle=lifecycle,
     )
 
