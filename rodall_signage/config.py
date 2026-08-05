@@ -26,6 +26,20 @@ def _read_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _read_positive_int(name: str, default: int) -> int:
+    raw_value = os.getenv(name, str(default)).strip()
+
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ValueError(f"{name} debe ser un número entero.") from error
+
+    if value <= 0:
+        raise ValueError(f"{name} debe ser mayor que cero.")
+
+    return value
+
+
 def _build_ipc_endpoint() -> tuple[str, str]:
     name = os.getenv("RODALL_IPC_NAME", "rodalltv-mpv").strip()
 
@@ -49,6 +63,13 @@ class AppSettings:
     runtime_dir: Path
     cache_dir: Path
     log_dir: Path
+    api_base_url: str
+    device_id: str
+    device_token: str
+    heartbeat_seconds: int
+    sync_seconds: int
+    content_dir: Path
+    manifest_path: Path
 
     @classmethod
     def from_environment(cls) -> "AppSettings":
@@ -57,6 +78,12 @@ class AppSettings:
         raw_media = os.getenv("RODALL_TEST_MEDIA", "").strip()
         media_path = Path(raw_media).expanduser() if raw_media else None
         configured_mpv = os.getenv("RODALL_MPV_PATH", "").strip()
+        api_base_url = os.getenv(
+            "RODALL_API_BASE_URL",
+            "http://localhost:5026",
+        ).rstrip("/")
+        device_id = os.getenv("RODALL_DEVICE_ID", "").strip()
+        device_token = os.getenv("RODALL_DEVICE_TOKEN", "").strip()
 
         if _BUNDLED_MPV.is_file() and configured_mpv in {"", "mpv", "mpv.exe"}:
             mpv_executable = str(_BUNDLED_MPV)
@@ -75,9 +102,20 @@ class AppSettings:
             runtime_dir=RUNTIME_DIR,
             cache_dir=CACHE_DIR,
             log_dir=LOG_DIR,
+            api_base_url=api_base_url,
+            device_id=device_id,
+            device_token=device_token,
+            heartbeat_seconds=_read_positive_int(
+                "RODALL_HEARTBEAT_SECONDS",
+                30,
+            ),
+            sync_seconds=_read_positive_int("RODALL_SYNC_SECONDS", 60),
+            content_dir=RUNTIME_DIR / "content",
+            manifest_path=CACHE_DIR / "active_manifest.json",
         )
 
     def ensure_directories(self) -> None:
         self.runtime_dir.mkdir(parents=True, exist_ok=True)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.content_dir.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,7 @@ import traceback
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from rodall_signage.api.device_api_client import DeviceApiClient
 from rodall_signage.config import AppSettings
 from rodall_signage.context import AppContext
 from rodall_signage.events import AppEventBus
@@ -13,7 +14,14 @@ from rodall_signage.logging_config import configure_logging
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
+from rodall_signage.services.heartbeat_service import HeartbeatService
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
+from rodall_signage.sync.content_store import ContentStore
+from rodall_signage.sync.manifest_playlist_adapter import (
+    ManifestPlaylistAdapter,
+)
+from rodall_signage.sync.manifest_store import ManifestStore
+from rodall_signage.sync.synchronization_service import SynchronizationService
 
 
 logger = logging.getLogger(__name__)
@@ -33,10 +41,29 @@ def build_context(settings: AppSettings) -> AppContext:
     player = MpvController(settings=settings)
     playback = PlaybackCoordinator(player=player)
     playlist_loader = LocalPlaylistLoader()
+    api_client = DeviceApiClient(settings=settings)
+    manifest_store = ManifestStore(settings.manifest_path)
+    content_store = ContentStore(settings.content_dir)
+    playlist_adapter = ManifestPlaylistAdapter(content_store)
+    synchronization = SynchronizationService(
+        api_client=api_client,
+        manifest_store=manifest_store,
+        content_store=content_store,
+        playlist_adapter=playlist_adapter,
+        playback=playback,
+        interval_seconds=settings.sync_seconds,
+    )
+    heartbeat = HeartbeatService(
+        api_client=api_client,
+        interval_seconds=settings.heartbeat_seconds,
+    )
     lifecycle = LifecycleService(
         event_bus=event_bus,
         player=player,
         playback=playback,
+        api_client=api_client,
+        synchronization=synchronization,
+        heartbeat=heartbeat,
     )
 
     return AppContext(
@@ -45,6 +72,12 @@ def build_context(settings: AppSettings) -> AppContext:
         player=player,
         playback=playback,
         playlist_loader=playlist_loader,
+        api_client=api_client,
+        manifest_store=manifest_store,
+        content_store=content_store,
+        playlist_adapter=playlist_adapter,
+        synchronization=synchronization,
+        heartbeat=heartbeat,
         lifecycle=lifecycle,
     )
 

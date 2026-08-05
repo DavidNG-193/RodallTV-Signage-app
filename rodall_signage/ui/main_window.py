@@ -100,6 +100,15 @@ class MainWindow(QMainWindow):
         self._context.playback.error_occurred.connect(
             self._on_playback_error
         )
+        self._context.synchronization.status_changed.connect(
+            self._context.event_bus.publish_status
+        )
+        self._context.synchronization.sync_failed.connect(
+            self._on_sync_failed
+        )
+        self._context.heartbeat.heartbeat_failed.connect(
+            self._on_heartbeat_failed
+        )
 
     def _load_demo_data(self) -> None:
         self._rates_bar.set_rates(DemoDataService.exchange_rates())
@@ -172,6 +181,11 @@ class MainWindow(QMainWindow):
 
         if self._media_path is not None:
             self._context.player.load(self._media_path)
+            return
+
+        self._context.synchronization.load_offline()
+        self._context.heartbeat.start()
+        self._context.synchronization.start()
 
     def _load_and_start_playlist(self) -> None:
         try:
@@ -224,6 +238,12 @@ class MainWindow(QMainWindow):
 
     def _on_player_error(self, message: str) -> None:
         self._context.lifecycle.mark_degraded(message)
+
+    def _on_sync_failed(self, message: str) -> None:
+        logger.warning("Sincronización fallida: %s", message)
+
+    def _on_heartbeat_failed(self, message: str) -> None:
+        logger.warning("Heartbeat fallido: %s", message)
 
     def _on_app_state_changed(self, state: AppState) -> None:
         self.setProperty("appState", state.value)

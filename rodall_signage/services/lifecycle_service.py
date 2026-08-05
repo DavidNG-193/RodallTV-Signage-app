@@ -4,10 +4,13 @@ import logging
 
 from PySide6.QtCore import QObject, Signal
 
+from rodall_signage.api.device_api_client import DeviceApiClient
 from rodall_signage.events import AppEventBus
 from rodall_signage.models import AppState
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
+from rodall_signage.services.heartbeat_service import HeartbeatService
+from rodall_signage.sync.synchronization_service import SynchronizationService
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +24,9 @@ class LifecycleService(QObject):
         event_bus: AppEventBus,
         player: MpvController,
         playback: PlaybackCoordinator,
+        api_client: DeviceApiClient,
+        synchronization: SynchronizationService,
+        heartbeat: HeartbeatService,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -28,6 +34,9 @@ class LifecycleService(QObject):
         self._event_bus = event_bus
         self._player = player
         self._playback = playback
+        self._api_client = api_client
+        self._synchronization = synchronization
+        self._heartbeat = heartbeat
         self._is_shutting_down = False
 
     def mark_starting(self) -> None:
@@ -55,9 +64,20 @@ class LifecycleService(QObject):
         self._event_bus.publish_state(AppState.STOPPING)
         self._event_bus.publish_status("Cerrando aplicación...")
 
+        operations = (
+            ("heartbeat", self._heartbeat.stop),
+            ("sincronización", self._synchronization.stop),
+            ("reproducción", self._playback.stop),
+            ("mpv", self._player.stop),
+            ("cliente API", self._api_client.close),
+        )
+
         try:
-            self._playback.stop()
-            self._player.stop()
+            for name, operation in operations:
+                try:
+                    operation()
+                except Exception:
+                    logger.exception("Falló el cierre de %s.", name)
         finally:
             self._event_bus.publish_state(AppState.STOPPED)
             self.shutdown_completed.emit()
