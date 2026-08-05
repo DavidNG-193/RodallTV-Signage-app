@@ -7,6 +7,7 @@ import traceback
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from rodall_signage.api.device_api_client import DeviceApiClient
+from rodall_signage.cache.cache_registry import CacheRegistry
 from rodall_signage.config import AppSettings
 from rodall_signage.context import AppContext
 from rodall_signage.events import AppEventBus
@@ -14,6 +15,7 @@ from rodall_signage.logging_config import configure_logging
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
+from rodall_signage.services.cache_demo_service import CacheDemoService
 from rodall_signage.services.heartbeat_service import HeartbeatService
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 from rodall_signage.sync.content_store import ContentStore
@@ -22,6 +24,9 @@ from rodall_signage.sync.manifest_playlist_adapter import (
 )
 from rodall_signage.sync.manifest_store import ManifestStore
 from rodall_signage.sync.synchronization_service import SynchronizationService
+from rodall_signage.stores.exchange_rate_store import ExchangeRateStore
+from rodall_signage.stores.reference_store import ReferenceStore
+from rodall_signage.stores.weather_store import WeatherStore
 
 
 logger = logging.getLogger(__name__)
@@ -57,6 +62,14 @@ def build_context(settings: AppSettings) -> AppContext:
         api_client=api_client,
         interval_seconds=settings.heartbeat_seconds,
     )
+    cache_registry = CacheRegistry(
+        exchange_rates=ExchangeRateStore(
+            settings.cache_dir / "exchange_rates.json"
+        ),
+        weather=WeatherStore(settings.cache_dir / "weather.json"),
+        references=ReferenceStore(settings.cache_dir / "references.json"),
+    )
+    cache_demo = CacheDemoService(cache_registry)
     lifecycle = LifecycleService(
         event_bus=event_bus,
         player=player,
@@ -78,6 +91,8 @@ def build_context(settings: AppSettings) -> AppContext:
         playlist_adapter=playlist_adapter,
         synchronization=synchronization,
         heartbeat=heartbeat,
+        cache_registry=cache_registry,
+        cache_demo=cache_demo,
         lifecycle=lifecycle,
     )
 

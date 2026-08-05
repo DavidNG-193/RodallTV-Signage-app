@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rodall_signage.api.device_api_client import DeviceApiClient
+from rodall_signage.cache.cache_registry import CacheRegistry
 from rodall_signage.config import AppSettings
 from rodall_signage.events import AppEventBus
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
+from rodall_signage.services.cache_demo_service import CacheDemoService
 from rodall_signage.services.heartbeat_service import HeartbeatService
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 from rodall_signage.sync.content_store import ContentStore
@@ -31,4 +33,6 @@ class AppContext:
     playlist_adapter: ManifestPlaylistAdapter
     synchronization: SynchronizationService
     heartbeat: HeartbeatService
+    cache_registry: CacheRegistry
+    cache_demo: CacheDemoService
     lifecycle: LifecycleService

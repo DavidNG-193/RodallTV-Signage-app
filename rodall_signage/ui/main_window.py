@@ -11,7 +11,6 @@ from rodall_signage.context import AppContext
 from rodall_signage.models import AppState
 from rodall_signage.player.mpv_models import MpvEvent
 from rodall_signage.player.playback_models import PlaybackSnapshot
-from rodall_signage.services.demo_data_service import DemoDataService
 from rodall_signage.ui.responsive import LayoutMetrics, metrics_for_width
 from rodall_signage.ui.theme import build_stylesheet
 from rodall_signage.ui.widgets import (
@@ -111,9 +110,24 @@ class MainWindow(QMainWindow):
         )
 
     def _load_demo_data(self) -> None:
-        self._rates_bar.set_rates(DemoDataService.exchange_rates())
-        self._weather_card.set_weather(DemoDataService.weather())
-        self._references_panel.set_references(DemoDataService.references())
+        self._context.cache_demo.seed()
+
+        rates = self._context.cache_registry.exchange_rates.read()
+        weather = self._context.cache_registry.weather.read()
+        references = self._context.cache_registry.references.read()
+
+        self._rates_bar.set_rates(
+            rates.envelope.payload if rates.envelope is not None else []
+        )
+        self._weather_card.set_weather(
+            weather.envelope.payload if weather.envelope is not None else None
+        )
+        self._references_panel.set_references(
+            references.envelope.payload
+            if references.envelope is not None
+            else []
+        )
+        self._context.cache_demo.log_status()
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
