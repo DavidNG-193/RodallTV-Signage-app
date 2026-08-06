@@ -7,21 +7,39 @@ from pathlib import Path
 
 
 def _ensure_project_python() -> None:
-    if importlib.util.find_spec("PySide6") is not None:
+    required_modules = ("PySide6", "requests", "dotenv")
+    missing_modules = [
+        module
+        for module in required_modules
+        if importlib.util.find_spec(module) is None
+    ]
+
+    if not missing_modules:
         return
 
     project_root = Path(__file__).resolve().parent
-    virtualenv_python = project_root / ".venv" / "Scripts" / "python.exe"
+    virtualenv_python = (
+        project_root / ".venv" / "Scripts" / "python.exe"
+        if os.name == "nt"
+        else project_root / ".venv" / "bin" / "python"
+    )
 
     if virtualenv_python.is_file():
+        if Path(sys.executable).resolve() == virtualenv_python.resolve():
+            missing = ", ".join(missing_modules)
+            raise RuntimeError(
+                f"Faltan dependencias en signage-app/.venv: {missing}. "
+                "Instala requirements-dev.txt en ese entorno."
+            )
+
         os.execv(
             str(virtualenv_python),
             [str(virtualenv_python), str(Path(__file__).resolve()), *sys.argv[1:]],
         )
 
     raise RuntimeError(
-        "PySide6 no está instalado y no existe signage-app/.venv. "
-        "Crea el entorno virtual e instala requirements-dev.txt."
+        "Faltan dependencias y no existe un entorno virtual compatible en "
+        "signage-app/.venv. Crea el entorno e instala requirements-dev.txt."
     )
 
 

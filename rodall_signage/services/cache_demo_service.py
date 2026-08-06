@@ -18,14 +18,6 @@ class CacheDemoService:
         generated_at = datetime.now(timezone.utc)
         writes = (
             (
-                "tasas",
-                lambda: self._registry.exchange_rates.write(
-                    DemoDataService.exchange_rates(),
-                    generated_at,
-                    generated_at + timedelta(hours=1),
-                ),
-            ),
-            (
                 "clima",
                 lambda: self._registry.weather.write(
                     DemoDataService.weather(),
@@ -51,7 +43,6 @@ class CacheDemoService:
 
     def log_status(self) -> None:
         stores = (
-            ("tasas", self._registry.exchange_rates),
             ("clima", self._registry.weather),
             ("referencias", self._registry.references),
         )

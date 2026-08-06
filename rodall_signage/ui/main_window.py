@@ -108,17 +108,19 @@ class MainWindow(QMainWindow):
         self._context.heartbeat.heartbeat_failed.connect(
             self._on_heartbeat_failed
         )
+        self._context.exchange_rate_update_service.snapshot_changed.connect(
+            self._rates_bar.set_snapshot
+        )
+        self._context.exchange_rate_update_service.availability_changed.connect(
+            self._rates_bar.set_cache_state
+        )
 
     def _load_demo_data(self) -> None:
         self._context.cache_demo.seed()
 
-        rates = self._context.cache_registry.exchange_rates.read()
         weather = self._context.cache_registry.weather.read()
         references = self._context.cache_registry.references.read()
 
-        self._rates_bar.set_rates(
-            rates.envelope.payload if rates.envelope is not None else []
-        )
         self._weather_card.set_weather(
             weather.envelope.payload if weather.envelope is not None else None
         )
@@ -127,6 +129,7 @@ class MainWindow(QMainWindow):
             if references.envelope is not None
             else []
         )
+        self._context.exchange_rate_update_service.publish_cached_value()
         self._context.cache_demo.log_status()
 
     def showEvent(self, event: QShowEvent) -> None:
@@ -191,15 +194,14 @@ class MainWindow(QMainWindow):
 
         if self._playlist_path is not None:
             self._load_and_start_playlist()
-            return
-
-        if self._media_path is not None:
+        elif self._media_path is not None:
             self._context.player.load(self._media_path)
-            return
+        else:
+            self._context.synchronization.load_offline()
+            self._context.heartbeat.start()
+            self._context.synchronization.start()
 
-        self._context.synchronization.load_offline()
-        self._context.heartbeat.start()
-        self._context.synchronization.start()
+        self._context.exchange_rate_update_service.start()
 
     def _load_and_start_playlist(self) -> None:
         try:

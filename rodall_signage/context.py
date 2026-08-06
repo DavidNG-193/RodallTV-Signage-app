@@ -11,6 +11,9 @@ from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
 from rodall_signage.services.cache_demo_service import CacheDemoService
 from rodall_signage.services.heartbeat_service import HeartbeatService
+from rodall_signage.services.exchange_rate_update_service import (
+    ExchangeRateUpdateService,
+)
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 from rodall_signage.sync.content_store import ContentStore
 from rodall_signage.sync.manifest_playlist_adapter import (
@@ -33,6 +36,7 @@ class AppContext:
     playlist_adapter: ManifestPlaylistAdapter
     synchronization: SynchronizationService
     heartbeat: HeartbeatService
+    exchange_rate_update_service: ExchangeRateUpdateService
     cache_registry: CacheRegistry
     cache_demo: CacheDemoService
     lifecycle: LifecycleService

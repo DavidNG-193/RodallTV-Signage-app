@@ -6,6 +6,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RUNTIME_DIR = PROJECT_ROOT / "runtime"
@@ -15,6 +17,23 @@ TEST_MEDIA_DIR = PROJECT_ROOT / "test-media"
 _BUNDLED_MPV = PROJECT_ROOT / (
     "mpv.exe" if platform.system() == "Windows" else "mpv"
 )
+
+
+def _load_environment_files() -> None:
+    # La ubicación oficial es signage-app/.env. Se conserva compatibilidad
+    # con rodall_signage/.env porque algunas instalaciones iniciales en
+    # Raspberry recibieron el archivo dentro del paquete.
+    candidates = (
+        PROJECT_ROOT / ".env",
+        Path(__file__).resolve().parent / ".env",
+        # Fallback de migración: reutiliza las credenciales ya provisionadas
+        # por el agente anterior sin copiarlas al código ni versionarlas.
+        PROJECT_ROOT.parent / "raspberry-agent" / ".env",
+    )
+
+    for path in candidates:
+        if path.is_file():
+            load_dotenv(dotenv_path=path, override=False)
 
 
 def _read_bool(name: str, default: bool) -> bool:
@@ -70,9 +89,11 @@ class AppSettings:
     sync_seconds: int
     content_dir: Path
     manifest_path: Path
+    exchange_rate_refresh_seconds: int
 
     @classmethod
     def from_environment(cls) -> "AppSettings":
+        _load_environment_files()
         ipc_argument, ipc_socket_name = _build_ipc_endpoint()
 
         raw_media = os.getenv("RODALL_TEST_MEDIA", "").strip()
@@ -82,7 +103,10 @@ class AppSettings:
             "RODALL_API_BASE_URL",
             "http://localhost:5026",
         ).rstrip("/")
-        device_id = os.getenv("RODALL_DEVICE_ID", "").strip()
+        device_id = os.getenv(
+            "RODALL_DEVICE_ID",
+            os.getenv("RODALL_DEVICE_UUID", ""),
+        ).strip()
         device_token = os.getenv("RODALL_DEVICE_TOKEN", "").strip()
 
         if _BUNDLED_MPV.is_file() and configured_mpv in {"", "mpv", "mpv.exe"}:
@@ -112,6 +136,10 @@ class AppSettings:
             sync_seconds=_read_positive_int("RODALL_SYNC_SECONDS", 60),
             content_dir=RUNTIME_DIR / "content",
             manifest_path=CACHE_DIR / "active_manifest.json",
+            exchange_rate_refresh_seconds=max(
+                _read_positive_int("RODALL_EXCHANGE_RATE_SECONDS", 3600),
+                300,
+            ),
         )
 
     def ensure_directories(self) -> None:

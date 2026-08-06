@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rodall_signage.models import ExchangeRate, RateTrend
+from rodall_signage.models import ExchangeRate, ExchangeRateSnapshot
 
 
 class ExchangeRateBar(QFrame):
@@ -21,6 +21,8 @@ class ExchangeRateBar(QFrame):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         self._rates: list[ExchangeRate] = []
+        self._snapshot: ExchangeRateSnapshot | None = None
+        self._cache_state = "missing"
         self._offset = 0
         self._cycle_width = 0
         self._track: QWidget | None = None
@@ -37,15 +39,65 @@ class ExchangeRateBar(QFrame):
         self._viewport.installEventFilter(self)
         root_layout.addWidget(self._viewport)
 
+        self._effective_date = QLabel("Fecha: --")
+        self._effective_date.setObjectName("rateStaticDate")
+        self._effective_date.setAlignment(Qt.AlignCenter)
+        self._effective_date.setMinimumWidth(150)
+        self._effective_date.setSizePolicy(
+            QSizePolicy.Fixed,
+            QSizePolicy.Expanding,
+        )
+        root_layout.addWidget(self._effective_date)
+
         self._scroll_timer = QTimer(self)
         self._scroll_timer.setInterval(24)
         self._scroll_timer.timeout.connect(self._advance_ticker)
 
-        self.set_rates([])
+        self.show_empty_state()
+
+    def set_snapshot(self, snapshot: ExchangeRateSnapshot) -> None:
+        self._snapshot = snapshot
+        if not snapshot.enabled:
+            self._rates = []
+            self._effective_date.setText("Fecha: --")
+            self._replace_track("Sin tasas configuradas")
+            return
+
+        self.set_rates(list(snapshot.rates))
+
+    def set_cache_state(self, state: str) -> None:
+        normalized = state.strip().lower()
+        self._cache_state = normalized
+
+        if normalized in {"missing", "invalid"} and not self._rates:
+            self.show_empty_state()
+            return
+
+        if self._rates:
+            self.set_rates(self._rates)
+
+    def show_empty_state(self) -> None:
+        self._snapshot = None
+        self._rates = []
+        self._effective_date.setText("Fecha: --")
+        self._replace_track("Tasas no disponibles")
 
     def set_rates(self, rates: list[ExchangeRate]) -> None:
+        self._rates = sorted(rates, key=lambda rate: rate.position)
+        if not self._rates:
+            self._effective_date.setText("Fecha: --")
+            self._replace_track("Tasas no disponibles")
+            return
+
+        latest_date = max(rate.effective_date for rate in self._rates)
+        self._effective_date.setText(
+            f"Fecha: {latest_date.strftime('%d/%m/%Y')}"
+        )
+
+        self._replace_track()
+
+    def _replace_track(self, empty_message: str | None = None) -> None:
         self._scroll_timer.stop()
-        self._rates = list(rates)
         self._offset = 0
         self._cycle_width = 0
         self._first_group = None
@@ -60,24 +112,30 @@ class ExchangeRateBar(QFrame):
         track_layout.setContentsMargins(20, 0, 20, 0)
         track_layout.setSpacing(34)
 
-        if not self._rates:
-            empty = QLabel("Sin tasas disponibles")
+        if empty_message is not None:
+            empty = QLabel(empty_message)
             empty.setObjectName("emptyState")
             track_layout.addWidget(empty)
             self._track.adjustSize()
             self._position_track()
+            self._track.show()
+            self._track.raise_()
             return
 
         first_group = self._build_rates_group()
         self._first_group = first_group
         track_layout.addWidget(first_group)
-
         for _ in range(self._REPEAT_COUNT - 1):
             track_layout.addWidget(self._build_rates_group())
 
         track_layout.activate()
         self._track.adjustSize()
         self._position_track()
+        # La pista no está administrada por un layout porque se desplaza con
+        # move(). Si se crea después de mostrar la ventana, Qt la deja oculta
+        # hasta que se llama show() explícitamente.
+        self._track.show()
+        self._track.raise_()
         QTimer.singleShot(0, self._start_scrolling)
 
     def set_bar_height(self, height: int) -> None:
@@ -103,30 +161,36 @@ class ExchangeRateBar(QFrame):
             entry_layout.setContentsMargins(0, 0, 0, 0)
             entry_layout.setSpacing(9)
 
-            symbol = QLabel(rate.label)
+            symbol = QLabel(rate.display_name)
             symbol.setObjectName("rateSymbol")
-
-            value = QLabel(f"{rate.value:,.2f}")
+            value = QLabel(rate.formatted_value())
             value.setObjectName("rateValue")
 
-            arrow = {
-                RateTrend.UP: "▲",
-                RateTrend.DOWN: "▼",
-                RateTrend.NEUTRAL: "•",
-            }[rate.trend]
+            if rate.change_percent is None:
+                arrow = "•"
+                change_object_name = "rateNeutral"
+            elif rate.change_percent > 0:
+                arrow = "▲"
+                change_object_name = "rateUp"
+            elif rate.change_percent < 0:
+                arrow = "▼"
+                change_object_name = "rateDown"
+            else:
+                arrow = "•"
+                change_object_name = "rateNeutral"
+
             change = QLabel(f"{arrow}  {rate.formatted_change()}")
-            change.setObjectName(
-                "rateUp"
-                if rate.trend == RateTrend.UP
-                else "rateDown"
-                if rate.trend == RateTrend.DOWN
-                else "rateNeutral"
-            )
+            change.setObjectName(change_object_name)
 
             entry_layout.addWidget(symbol)
             entry_layout.addWidget(value)
             entry_layout.addWidget(change)
             layout.addWidget(entry)
+
+        if self._cache_state in {"expired", "stale"}:
+            stale = QLabel("Último dato disponible")
+            stale.setObjectName("rateStale")
+            layout.addWidget(stale)
 
         return group
 
@@ -147,14 +211,12 @@ class ExchangeRateBar(QFrame):
     def _advance_ticker(self) -> None:
         if self._track is None or self._cycle_width <= 0:
             return
-
         self._offset = (self._offset + 1) % self._cycle_width
         self._position_track()
 
     def _position_track(self) -> None:
         if self._track is None:
             return
-
         size_hint = self._track.sizeHint()
         track_height = max(size_hint.height(), self._viewport.height())
         self._track.resize(size_hint.width(), track_height)

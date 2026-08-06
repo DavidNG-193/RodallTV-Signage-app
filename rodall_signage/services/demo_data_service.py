@@ -1,16 +1,7 @@
 from __future__ import annotations
-from rodall_signage.models import DailyReference, ExchangeRate, RateTrend, WeatherSnapshot
+from rodall_signage.models import DailyReference, WeatherSnapshot
 
 class DemoDataService:
-    @staticmethod
-    def exchange_rates() -> list[ExchangeRate]:
-        return [
-            ExchangeRate("USD", "USD / MXN", 18.6241, RateTrend.UP, 0.12),
-            ExchangeRate("EUR", "EUR / MXN", 21.4078, RateTrend.DOWN, -0.08),
-            ExchangeRate("CAD", "CAD / MXN", 13.5427, RateTrend.NEUTRAL, 0.00),
-            ExchangeRate("GBP", "GBP / MXN", 24.8913, RateTrend.UP, 0.21),
-        ]
-
     @staticmethod
     def weather() -> WeatherSnapshot:
         return WeatherSnapshot(

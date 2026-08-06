@@ -10,6 +10,9 @@ from rodall_signage.models import AppState
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.heartbeat_service import HeartbeatService
+from rodall_signage.services.exchange_rate_update_service import (
+    ExchangeRateUpdateService,
+)
 from rodall_signage.sync.synchronization_service import SynchronizationService
 
 
@@ -27,6 +30,7 @@ class LifecycleService(QObject):
         api_client: DeviceApiClient,
         synchronization: SynchronizationService,
         heartbeat: HeartbeatService,
+        exchange_rate_update_service: ExchangeRateUpdateService,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -37,6 +41,7 @@ class LifecycleService(QObject):
         self._api_client = api_client
         self._synchronization = synchronization
         self._heartbeat = heartbeat
+        self._exchange_rate_update_service = exchange_rate_update_service
         self._is_shutting_down = False
 
     def mark_starting(self) -> None:
@@ -65,6 +70,7 @@ class LifecycleService(QObject):
         self._event_bus.publish_status("Cerrando aplicación...")
 
         operations = (
+            ("tasas de cambio", self._exchange_rate_update_service.stop),
             ("heartbeat", self._heartbeat.stop),
             ("sincronización", self._synchronization.stop),
             ("reproducción", self._playback.stop),

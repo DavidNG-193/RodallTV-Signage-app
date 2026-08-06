@@ -17,6 +17,9 @@ from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
 from rodall_signage.services.cache_demo_service import CacheDemoService
 from rodall_signage.services.heartbeat_service import HeartbeatService
+from rodall_signage.services.exchange_rate_update_service import (
+    ExchangeRateUpdateService,
+)
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 from rodall_signage.sync.content_store import ContentStore
 from rodall_signage.sync.manifest_playlist_adapter import (
@@ -70,6 +73,11 @@ def build_context(settings: AppSettings) -> AppContext:
         references=ReferenceStore(settings.cache_dir / "references.json"),
     )
     cache_demo = CacheDemoService(cache_registry)
+    exchange_rate_update_service = ExchangeRateUpdateService(
+        api_client=api_client,
+        store=cache_registry.exchange_rates,
+        refresh_seconds=settings.exchange_rate_refresh_seconds,
+    )
     lifecycle = LifecycleService(
         event_bus=event_bus,
         player=player,
@@ -77,6 +85,7 @@ def build_context(settings: AppSettings) -> AppContext:
         api_client=api_client,
         synchronization=synchronization,
         heartbeat=heartbeat,
+        exchange_rate_update_service=exchange_rate_update_service,
     )
 
     return AppContext(
@@ -91,6 +100,7 @@ def build_context(settings: AppSettings) -> AppContext:
         playlist_adapter=playlist_adapter,
         synchronization=synchronization,
         heartbeat=heartbeat,
+        exchange_rate_update_service=exchange_rate_update_service,
         cache_registry=cache_registry,
         cache_demo=cache_demo,
         lifecycle=lifecycle,

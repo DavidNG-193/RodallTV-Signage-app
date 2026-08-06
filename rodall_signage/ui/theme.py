@@ -37,6 +37,13 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         font-size: {metrics.body_size}px;
         font-weight: 800;
     }}
+    QLabel#rateStaticDate {{
+        color: #7186a8;
+        background: #0b1424;
+        border-left: 1px solid #24334b;
+        font-size: {max(metrics.body_size - 2, 11)}px;
+        padding: 0 12px;
+    }}
     QLabel#rateUp {{
         color: #2dd4bf;
         font-size: {max(metrics.body_size - 2, 11)}px;
@@ -49,6 +56,11 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
     }}
     QLabel#rateNeutral {{
         color: #94a3b8;
+        font-size: {max(metrics.body_size - 2, 11)}px;
+        font-weight: 700;
+    }}
+    QLabel#rateStale {{
+        color: #e7b454;
         font-size: {max(metrics.body_size - 2, 11)}px;
         font-weight: 700;
     }}
