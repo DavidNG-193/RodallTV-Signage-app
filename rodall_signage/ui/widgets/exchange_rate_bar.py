@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from PySide6.QtCore import QEvent, QTimer, Qt
 from PySide6.QtWidgets import (
     QFrame,
@@ -14,6 +16,20 @@ from rodall_signage.models import ExchangeRate, ExchangeRateSnapshot
 
 class ExchangeRateBar(QFrame):
     _REPEAT_COUNT = 6
+    _MONTHS = (
+        "ENE",
+        "FEB",
+        "MAR",
+        "ABR",
+        "MAY",
+        "JUN",
+        "JUL",
+        "AGO",
+        "SEP",
+        "OCT",
+        "NOV",
+        "DIC",
+    )
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -39,10 +55,10 @@ class ExchangeRateBar(QFrame):
         self._viewport.installEventFilter(self)
         root_layout.addWidget(self._viewport)
 
-        self._effective_date = QLabel("Fecha: --")
+        self._effective_date = QLabel("ACT. --\nBANXICO --")
         self._effective_date.setObjectName("rateStaticDate")
         self._effective_date.setAlignment(Qt.AlignCenter)
-        self._effective_date.setMinimumWidth(150)
+        self._effective_date.setMinimumWidth(165)
         self._effective_date.setSizePolicy(
             QSizePolicy.Fixed,
             QSizePolicy.Expanding,
@@ -59,7 +75,7 @@ class ExchangeRateBar(QFrame):
         self._snapshot = snapshot
         if not snapshot.enabled:
             self._rates = []
-            self._effective_date.setText("Fecha: --")
+            self._effective_date.setText("ACT. --\nBANXICO --")
             self._replace_track("Sin tasas configuradas")
             return
 
@@ -79,22 +95,42 @@ class ExchangeRateBar(QFrame):
     def show_empty_state(self) -> None:
         self._snapshot = None
         self._rates = []
-        self._effective_date.setText("Fecha: --")
+        self._effective_date.setText("ACT. --\nBANXICO --")
         self._replace_track("Tasas no disponibles")
 
     def set_rates(self, rates: list[ExchangeRate]) -> None:
         self._rates = sorted(rates, key=lambda rate: rate.position)
         if not self._rates:
-            self._effective_date.setText("Fecha: --")
+            self._effective_date.setText("ACT. --\nBANXICO --")
             self._replace_track("Tasas no disponibles")
             return
 
         latest_date = max(rate.effective_date for rate in self._rates)
         self._effective_date.setText(
-            f"Fecha: {latest_date.strftime('%d/%m/%Y')}"
+            f"{self._format_updated_at()}\n"
+            f"BANXICO {latest_date.day:02d} "
+            f"{self._MONTHS[latest_date.month - 1]}."
         )
 
         self._replace_track()
+
+    def _format_updated_at(self) -> str:
+        fetched_at = (
+            self._snapshot.fetched_at_utc
+            if self._snapshot is not None
+            else None
+        )
+        if fetched_at is None:
+            return "ACT. --"
+
+        if fetched_at.tzinfo is None:
+            fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+        local_time = fetched_at.astimezone()
+        if local_time.date() == datetime.now().astimezone().date():
+            return f"ACT. hoy {local_time:%H:%M}"
+
+        month = self._MONTHS[local_time.month - 1]
+        return f"ACT. {local_time.day:02d} {month}. {local_time:%H:%M}"
 
     def _replace_track(self, empty_message: str | None = None) -> None:
         self._scroll_timer.stop()

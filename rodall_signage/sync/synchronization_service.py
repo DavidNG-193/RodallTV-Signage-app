@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
+import requests
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 
@@ -19,6 +20,38 @@ from rodall_signage.sync.manifest_store import ManifestStore
 
 
 logger = logging.getLogger(__name__)
+
+
+def _friendly_sync_error(error: Exception) -> str:
+    raw_message = str(error) or type(error).__name__
+    error_name = type(error).__name__
+
+    if (
+        isinstance(error, requests.exceptions.ConnectTimeout)
+        or "ConnectTimeoutError" in raw_message
+        or "ConnectTimeout" in error_name
+    ):
+        return "No fue posible conectar con el backend dentro del tiempo esperado."
+
+    if isinstance(error, requests.exceptions.ReadTimeout):
+        return "El backend no respondió dentro del tiempo esperado."
+
+    if isinstance(error, requests.exceptions.Timeout):
+        return "La comunicación con el backend excedió el tiempo esperado."
+
+    if isinstance(error, requests.exceptions.ConnectionError):
+        return "No fue posible establecer conexión con el backend."
+
+    if isinstance(error, requests.exceptions.HTTPError):
+        response = error.response
+        if response is not None:
+            return (
+                "El backend rechazó la sincronización "
+                f"(HTTP {response.status_code})."
+            )
+        return "El backend rechazó la solicitud de sincronización."
+
+    return raw_message
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +181,7 @@ class _SynchronizationWorker(QObject):
             logger.info("Sincronización cancelada durante el cierre.")
             self.failed.emit("Sincronización cancelada durante el cierre.")
         except Exception as error:
-            message = str(error) or type(error).__name__
+            message = _friendly_sync_error(error)
             logger.exception("Falló la sincronización: %s", message)
             self._try_report_failure(
                 playlist_id=(
@@ -185,9 +218,10 @@ class _SynchronizationWorker(QObject):
             )
             self.completed.emit(message)
         except Exception as error:
+            friendly_error = _friendly_sync_error(error)
             report_message = (
                 "El contenido fue activado, pero no se pudo reportar el "
-                f"resultado: {error}"
+                f"resultado: {friendly_error}"
             )
             logger.exception(report_message)
             self.failed.emit(report_message)

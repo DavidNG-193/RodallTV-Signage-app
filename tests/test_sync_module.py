@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 from types import SimpleNamespace
 import unittest
+import requests
 
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
 
@@ -68,6 +69,8 @@ class FakeSession:
                     "pendingPowerCommand": {"commandId": "command-1"},
                 }
             )
+        if url.endswith("/power-command/acknowledge"):
+            return FakeJsonResponse({})
         return FakeJsonResponse({"accepted": True})
 
     def get(self, url: str, **kwargs):
@@ -122,6 +125,14 @@ class FakePlayback:
 
     def start(self) -> None:
         self.started = True
+
+
+class ConnectTimeoutApiClient(FakeApiClient):
+    def get_assignment(self) -> AssignmentStatus:
+        raise requests.exceptions.ConnectTimeout(
+            "HTTPConnectionPool: Max retries exceeded with url; "
+            "ConnectTimeoutError: connection timed out"
+        )
 
 
 def manifest_item(
@@ -322,6 +333,30 @@ class SyncModuleTests(unittest.TestCase):
         )
         self.assertEqual(api.reports[-1].result, SyncResult.FAILED)
 
+    def test_connect_timeout_reports_a_short_status_message(self) -> None:
+        api = ConnectTimeoutApiClient(
+            AssignmentStatus(False, None, 0, False),
+            {},
+            {},
+        )
+        worker = _SynchronizationWorker(
+            api,
+            self.manifest_store,
+            self.content_store,
+            self.adapter,
+        )
+        failures: list[str] = []
+        worker.failed.connect(failures.append)
+
+        worker.synchronize()
+
+        expected = (
+            "No fue posible conectar con el backend dentro del tiempo esperado."
+        )
+        self.assertEqual(failures, [expected])
+        self.assertEqual(api.reports[-1].result, SyncResult.FAILED)
+        self.assertEqual(api.reports[-1].message, expected)
+
     def test_offline_load_activates_only_valid_content(self) -> None:
         content = b"offline content"
         item = manifest_item(content)
@@ -410,6 +445,7 @@ class SyncModuleTests(unittest.TestCase):
         client._thread_local.session = session
 
         heartbeat = client.heartbeat()
+        client.acknowledge_power_command("command-1")
         assignment = client.get_assignment()
         started = datetime(2026, 8, 4, tzinfo=timezone.utc)
         client.report_sync(
@@ -428,6 +464,16 @@ class SyncModuleTests(unittest.TestCase):
         self.assertEqual(heartbeat.server_time, "2026-08-04T00:00:00Z")
         self.assertEqual(
             heartbeat.pending_power_command,
+            {"commandId": "command-1"},
+        )
+        acknowledge_call = session.calls[1]
+        self.assertTrue(
+            acknowledge_call[1].endswith(
+                "/api/agent/power-command/acknowledge"
+            )
+        )
+        self.assertEqual(
+            acknowledge_call[2]["json"],
             {"commandId": "command-1"},
         )
         self.assertEqual(assignment.playlist_version, 0)

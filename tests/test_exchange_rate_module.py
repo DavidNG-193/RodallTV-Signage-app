@@ -43,9 +43,10 @@ class ExchangeRateModuleTests(unittest.TestCase):
 
     @staticmethod
     def _payload() -> dict:
+        fetched_at = datetime.now(timezone.utc)
         return {
             "enabled": True,
-            "fetchedAtUtc": "2026-08-05T21:00:00Z",
+            "fetchedAtUtc": fetched_at.isoformat().replace("+00:00", "Z"),
             "expiresAtUtc": "2026-08-05T22:00:00Z",
             "source": "Banco de México SIE",
             "isStale": False,
@@ -140,7 +141,9 @@ class ExchangeRateModuleTests(unittest.TestCase):
         self.assertIn("USD / MXN", visible_text)
         self.assertIn("18.7523", visible_text)
         self.assertIn("▲  +0.12%", visible_text)
-        self.assertEqual(widget._effective_date.text(), "Fecha: 05/08/2026")
+        update_lines = widget._effective_date.text().splitlines()
+        self.assertRegex(update_lines[0], r"^ACT\. hoy \d{2}:\d{2}$")
+        self.assertEqual(update_lines[1], "BANXICO 05 AGO.")
         self.assertNotIn("05/08/2026", visible_text)
 
 

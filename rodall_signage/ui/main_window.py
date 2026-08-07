@@ -11,6 +11,7 @@ from rodall_signage.context import AppContext
 from rodall_signage.models import AppState
 from rodall_signage.player.mpv_models import MpvEvent
 from rodall_signage.player.playback_models import PlaybackSnapshot
+from rodall_signage.services.power_manager import PowerManager
 from rodall_signage.ui.responsive import LayoutMetrics, metrics_for_width
 from rodall_signage.ui.theme import build_stylesheet
 from rodall_signage.ui.widgets import (
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         self._player_started = False
         self._allow_close = False
         self._current_metrics: LayoutMetrics | None = None
+        self._pending_power_command: str | None = None
 
         self.setWindowTitle(context.settings.app_name)
         self.setMinimumSize(960, 540)
@@ -107,6 +109,12 @@ class MainWindow(QMainWindow):
         )
         self._context.heartbeat.heartbeat_failed.connect(
             self._on_heartbeat_failed
+        )
+        self._context.heartbeat.power_command_ready.connect(
+            self._on_power_command_ready
+        )
+        self._context.heartbeat.power_command_failed.connect(
+            self._on_power_command_failed
         )
         self._context.exchange_rate_update_service.snapshot_changed.connect(
             self._rates_bar.set_snapshot
@@ -261,6 +269,24 @@ class MainWindow(QMainWindow):
     def _on_heartbeat_failed(self, message: str) -> None:
         logger.warning("Heartbeat fallido: %s", message)
 
+    def _on_power_command_ready(self, command_type: str) -> None:
+        if self._pending_power_command is not None:
+            return
+
+        self._pending_power_command = command_type
+        action = "reinicio" if command_type == "Restart" else "apagado"
+        logger.warning("Orden remota de %s confirmada.", action)
+        self._context.event_bus.publish_status(
+            f"Preparando {action} remoto..."
+        )
+        self._context.lifecycle.shutdown()
+
+    def _on_power_command_failed(self, message: str) -> None:
+        logger.error("Comando de energía rechazado: %s", message)
+        self._context.event_bus.publish_status(
+            "No fue posible procesar el comando remoto."
+        )
+
     def _on_app_state_changed(self, state: AppState) -> None:
         self.setProperty("appState", state.value)
         self.style().unpolish(self)
@@ -268,4 +294,9 @@ class MainWindow(QMainWindow):
 
     def _complete_close(self) -> None:
         self._allow_close = True
+        if self._pending_power_command is not None:
+            try:
+                PowerManager.execute(self._pending_power_command)
+            except Exception:
+                logger.exception("Falló el comando remoto de energía.")
         QTimer.singleShot(0, self.close)

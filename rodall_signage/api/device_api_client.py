@@ -112,6 +112,18 @@ class DeviceApiClient:
         )
         response.raise_for_status()
 
+    def acknowledge_power_command(self, command_id: str) -> None:
+        if not command_id.strip():
+            raise ValueError("El identificador del comando es obligatorio.")
+
+        response = self._session().post(
+            self._url("/api/agent/power-command/acknowledge"),
+            headers=self._headers(),
+            json={"commandId": command_id},
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+
     def close(self) -> None:
         with self._sessions_lock:
             sessions = tuple(self._sessions)
