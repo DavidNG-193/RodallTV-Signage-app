@@ -55,7 +55,7 @@ class ExchangeRateBar(QFrame):
         self._viewport.installEventFilter(self)
         root_layout.addWidget(self._viewport)
 
-        self._effective_date = QLabel("ACT. --\nBANXICO --")
+        self._effective_date = QLabel("Consultado: --\nBANXICO --")
         self._effective_date.setObjectName("rateStaticDate")
         self._effective_date.setAlignment(Qt.AlignCenter)
         self._effective_date.setMinimumWidth(165)
@@ -75,7 +75,7 @@ class ExchangeRateBar(QFrame):
         self._snapshot = snapshot
         if not snapshot.enabled:
             self._rates = []
-            self._effective_date.setText("ACT. --\nBANXICO --")
+            self._effective_date.setText("Consultado: --\nBANXICO --")
             self._replace_track("Sin tasas configuradas")
             return
 
@@ -95,13 +95,13 @@ class ExchangeRateBar(QFrame):
     def show_empty_state(self) -> None:
         self._snapshot = None
         self._rates = []
-        self._effective_date.setText("ACT. --\nBANXICO --")
+        self._effective_date.setText("Consultado: --\nBANXICO --")
         self._replace_track("Tasas no disponibles")
 
     def set_rates(self, rates: list[ExchangeRate]) -> None:
         self._rates = sorted(rates, key=lambda rate: rate.position)
         if not self._rates:
-            self._effective_date.setText("ACT. --\nBANXICO --")
+            self._effective_date.setText("Consultado: --\nBANXICO --")
             self._replace_track("Tasas no disponibles")
             return
 
@@ -121,16 +121,16 @@ class ExchangeRateBar(QFrame):
             else None
         )
         if fetched_at is None:
-            return "ACT. --"
+            return "Consultado: --"
 
         if fetched_at.tzinfo is None:
             fetched_at = fetched_at.replace(tzinfo=timezone.utc)
         local_time = fetched_at.astimezone()
         if local_time.date() == datetime.now().astimezone().date():
-            return f"ACT. hoy {local_time:%H:%M}"
+            return f"Consultado: hoy {local_time:%H:%M}"
 
         month = self._MONTHS[local_time.month - 1]
-        return f"ACT. {local_time.day:02d} {month}. {local_time:%H:%M}"
+        return f"Consultado: {local_time.day:02d} {month}. {local_time:%H:%M}"
 
     def _replace_track(self, empty_message: str | None = None) -> None:
         self._scroll_timer.stop()

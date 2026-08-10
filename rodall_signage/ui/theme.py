@@ -100,6 +100,11 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         font-size: {metrics.body_size + 3}px;
         font-weight: 500;
     }}
+    QLabel#weatherApparent {{
+        color: #d8f1ff;
+        font-size: {small_text}px;
+        font-weight: 600;
+    }}
     QFrame#weatherDivider {{
         color: rgba(255, 255, 255, 70);
         background: rgba(255, 255, 255, 70);
@@ -115,6 +120,11 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         color: #ffffff;
         font-size: {small_text + 1}px;
         font-weight: 800;
+    }}
+    QLabel#weatherAvailability {{
+        color: #f6c85f;
+        font-size: {badge_text}px;
+        font-weight: 700;
     }}
 
     QFrame#referencesPanel {{

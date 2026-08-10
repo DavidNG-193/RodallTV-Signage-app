@@ -90,6 +90,7 @@ class AppSettings:
     content_dir: Path
     manifest_path: Path
     exchange_rate_refresh_seconds: int
+    weather_refresh_seconds: int
 
     @classmethod
     def from_environment(cls) -> "AppSettings":
@@ -138,6 +139,10 @@ class AppSettings:
             manifest_path=CACHE_DIR / "active_manifest.json",
             exchange_rate_refresh_seconds=max(
                 _read_positive_int("RODALL_EXCHANGE_RATE_SECONDS", 3600),
+                300,
+            ),
+            weather_refresh_seconds=max(
+                _read_positive_int("RODALL_WEATHER_SECONDS", 900),
                 300,
             ),
         )

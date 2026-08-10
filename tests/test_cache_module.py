@@ -17,7 +17,11 @@ from rodall_signage.cache.cache_models import CacheFreshness
 from rodall_signage.cache.cache_registry import CacheRegistry
 from rodall_signage.cache.json_cache_store import JsonCacheStore
 from rodall_signage.services.cache_demo_service import CacheDemoService
-from rodall_signage.models import ExchangeRate, ExchangeRateSnapshot
+from rodall_signage.models import (
+    ExchangeRate,
+    ExchangeRateSnapshot,
+    WeatherSnapshot,
+)
 from rodall_signage.stores.exchange_rate_store import ExchangeRateStore
 from rodall_signage.stores.reference_store import ReferenceStore
 from rodall_signage.stores.weather_store import WeatherStore
@@ -78,6 +82,26 @@ class CacheModuleTests(unittest.TestCase):
         self.registry.exchange_rates.save(snapshot)
         return snapshot
 
+    def _save_weather(self) -> WeatherSnapshot:
+        now = datetime.now(timezone.utc)
+        snapshot = WeatherSnapshot(
+            enabled=True,
+            location_name="Veracruz, VER",
+            fetched_at_utc=now,
+            expires_at_utc=now + timedelta(minutes=15),
+            is_stale=False,
+            temperature_c=29.2,
+            apparent_temperature_c=32.1,
+            relative_humidity_percent=76,
+            precipitation_mm=0,
+            weather_code=2,
+            description="Parcialmente nublado",
+            wind_speed_kmh=18,
+            observation_time=datetime(2026, 8, 7, 9, 0),
+        )
+        self.registry.weather.save(snapshot)
+        return snapshot
+
     def tearDown(self) -> None:
         self._clear_directory(self.root)
 
@@ -92,6 +116,7 @@ class CacheModuleTests(unittest.TestCase):
     def test_fresh_roundtrip_uses_utc_and_leaves_no_temporaries(self) -> None:
         self.demo.seed()
         self._save_rates()
+        self._save_weather()
 
         results = (
             self.registry.exchange_rates.read(),
@@ -103,7 +128,10 @@ class CacheModuleTests(unittest.TestCase):
             all(result.freshness == CacheFreshness.FRESH for result in results)
         )
         self.assertEqual(len(results[0].envelope.payload.rates), 1)
-        self.assertEqual(results[1].envelope.payload.location, "Veracruz, VER")
+        self.assertEqual(
+            results[1].envelope.payload.location_name,
+            "Veracruz, VER",
+        )
         self.assertEqual(len(results[2].envelope.payload), 6)
 
         for path in (
@@ -112,7 +140,14 @@ class CacheModuleTests(unittest.TestCase):
             self.registry.references.path,
         ):
             raw = json.loads(path.read_text(encoding="utf-8"))
-            expected_schema = 2 if path == self.registry.exchange_rates.path else 1
+            expected_schema = (
+                2
+                if path in {
+                    self.registry.exchange_rates.path,
+                    self.registry.weather.path,
+                }
+                else 1
+            )
             self.assertEqual(raw["schemaVersion"], expected_schema)
             self.assertTrue(raw["generatedAt"].endswith("Z"))
             self.assertTrue(raw["expiresAt"].endswith("Z"))
@@ -122,6 +157,7 @@ class CacheModuleTests(unittest.TestCase):
     def test_expired_cache_keeps_its_last_valid_payload(self) -> None:
         self.demo.seed()
         self._save_rates()
+        self._save_weather()
         references = self.registry.references.read().envelope.payload
         now = datetime.now(timezone.utc)
         self.registry.references.write(
@@ -143,6 +179,7 @@ class CacheModuleTests(unittest.TestCase):
     def test_missing_cache_is_independent_from_other_stores(self) -> None:
         self.demo.seed()
         self._save_rates()
+        self._save_weather()
         self.registry.references.delete()
 
         missing = self.registry.references.read()
@@ -164,6 +201,7 @@ class CacheModuleTests(unittest.TestCase):
     def test_corrupt_json_is_invalid_and_does_not_raise(self) -> None:
         self.demo.seed()
         self._save_rates()
+        self._save_weather()
         self.registry.weather.path.write_text("{broken", encoding="utf-8")
 
         result = self.registry.weather.read()
@@ -179,11 +217,12 @@ class CacheModuleTests(unittest.TestCase):
         widget.set_weather(
             result.envelope.payload if result.envelope is not None else None
         )
-        self.assertEqual(widget._location.text(), "Sin ubicación")
+        self.assertEqual(widget._location.text(), "Clima no disponible")
 
     def test_incompatible_schema_is_invalid_and_file_is_preserved(self) -> None:
         self.demo.seed()
         self._save_rates()
+        self._save_weather()
         path = self.registry.exchange_rates.path
         raw = json.loads(path.read_text(encoding="utf-8"))
         raw["schemaVersion"] = 999
@@ -224,6 +263,7 @@ class CacheModuleTests(unittest.TestCase):
     def test_widgets_receive_models_from_cache_results(self) -> None:
         self.demo.seed()
         self._save_rates()
+        self._save_weather()
         rates = self.registry.exchange_rates.read()
         weather = self.registry.weather.read()
         references = self.registry.references.read()

@@ -1,15 +1,25 @@
 from __future__ import annotations
 from rodall_signage.models import DailyReference, WeatherSnapshot
+from datetime import datetime, timedelta, timezone
 
 class DemoDataService:
     @staticmethod
     def weather() -> WeatherSnapshot:
+        now = datetime.now(timezone.utc)
         return WeatherSnapshot(
-            location="Veracruz, VER",
-            temperature_celsius=29,
-            condition="Parcialmente nublado",
-            humidity_percent=76,
-            wind_kph=18,
+            enabled=True,
+            location_name="Veracruz, VER",
+            fetched_at_utc=now,
+            expires_at_utc=now + timedelta(minutes=15),
+            is_stale=False,
+            temperature_c=29,
+            apparent_temperature_c=32,
+            relative_humidity_percent=76,
+            precipitation_mm=0,
+            weather_code=2,
+            description="Parcialmente nublado",
+            wind_speed_kmh=18,
+            observation_time=now.replace(tzinfo=None),
         )
 
     @staticmethod

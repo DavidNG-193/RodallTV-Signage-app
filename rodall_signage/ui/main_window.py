@@ -122,22 +122,25 @@ class MainWindow(QMainWindow):
         self._context.exchange_rate_update_service.availability_changed.connect(
             self._rates_bar.set_cache_state
         )
+        self._context.weather_update_service.snapshot_changed.connect(
+            self._weather_card.set_snapshot
+        )
+        self._context.weather_update_service.availability_changed.connect(
+            self._weather_card.set_cache_state
+        )
 
     def _load_demo_data(self) -> None:
         self._context.cache_demo.seed()
 
-        weather = self._context.cache_registry.weather.read()
         references = self._context.cache_registry.references.read()
 
-        self._weather_card.set_weather(
-            weather.envelope.payload if weather.envelope is not None else None
-        )
         self._references_panel.set_references(
             references.envelope.payload
             if references.envelope is not None
             else []
         )
         self._context.exchange_rate_update_service.publish_cached_value()
+        self._context.weather_update_service.publish_cached_value()
         self._context.cache_demo.log_status()
 
     def showEvent(self, event: QShowEvent) -> None:
@@ -210,6 +213,7 @@ class MainWindow(QMainWindow):
             self._context.synchronization.start()
 
         self._context.exchange_rate_update_service.start()
+        self._context.weather_update_service.start()
 
     def _load_and_start_playlist(self) -> None:
         try:

@@ -1,23 +1,31 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+from datetime import datetime
+
 
 @dataclass(frozen=True, slots=True)
 class WeatherSnapshot:
-    location: str
-    temperature_celsius: float | None
-    condition: str
-    humidity_percent: int | None = None
-    wind_kph: float | None = None
+    enabled: bool
+    location_name: str | None
+    fetched_at_utc: datetime | None
+    expires_at_utc: datetime | None
+    is_stale: bool
+    temperature_c: float | None
+    apparent_temperature_c: float | None
+    relative_humidity_percent: int | None
+    precipitation_mm: float | None
+    weather_code: int | None
+    description: str | None
+    wind_speed_kmh: float | None
+    observation_time: datetime | None
 
     def temperature_text(self) -> str:
-        if self.temperature_celsius is None:
+        if self.temperature_c is None:
             return "--°C"
-        return f"{round(self.temperature_celsius)}°C"
+        return f"{round(self.temperature_c)}°C"
 
-    def details_text(self) -> str:
-        details: list[str] = []
-        if self.humidity_percent is not None:
-            details.append(f"Humedad: {self.humidity_percent}%")
-        if self.wind_kph is not None:
-            details.append(f"Viento: {self.wind_kph:.0f} km/h")
-        return "  •  ".join(details)
+    def apparent_temperature_text(self) -> str:
+        if self.apparent_temperature_c is None:
+            return "Sensación: --"
+        return f"Sensación: {round(self.apparent_temperature_c)}°C"

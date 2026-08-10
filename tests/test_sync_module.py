@@ -75,6 +75,13 @@ class FakeSession:
 
     def get(self, url: str, **kwargs):
         self.calls.append(("GET", url, kwargs))
+        if url.endswith("/weather"):
+            return FakeJsonResponse(
+                {
+                    "enabled": False,
+                    "isStale": False,
+                }
+            )
         return FakeJsonResponse(
             {
                 "hasAssignment": True,
@@ -446,6 +453,7 @@ class SyncModuleTests(unittest.TestCase):
 
         heartbeat = client.heartbeat()
         client.acknowledge_power_command("command-1")
+        weather = client.get_weather()
         assignment = client.get_assignment()
         started = datetime(2026, 8, 4, tzinfo=timezone.utc)
         client.report_sync(
@@ -476,6 +484,7 @@ class SyncModuleTests(unittest.TestCase):
             acknowledge_call[2]["json"],
             {"commandId": "command-1"},
         )
+        self.assertEqual(weather, {"enabled": False, "isStale": False})
         self.assertEqual(assignment.playlist_version, 0)
         report_call = session.calls[-1]
         self.assertEqual(report_call[2]["json"]["result"], "NoChanges")

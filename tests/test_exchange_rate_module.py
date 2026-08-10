@@ -142,7 +142,10 @@ class ExchangeRateModuleTests(unittest.TestCase):
         self.assertIn("18.7523", visible_text)
         self.assertIn("▲  +0.12%", visible_text)
         update_lines = widget._effective_date.text().splitlines()
-        self.assertRegex(update_lines[0], r"^ACT\. hoy \d{2}:\d{2}$")
+        self.assertRegex(
+            update_lines[0],
+            r"^Consultado: hoy \d{2}:\d{2}$",
+        )
         self.assertEqual(update_lines[1], "BANXICO 05 AGO.")
         self.assertNotIn("05/08/2026", visible_text)
 

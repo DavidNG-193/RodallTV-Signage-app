@@ -21,6 +21,7 @@ from rodall_signage.services.exchange_rate_update_service import (
     ExchangeRateUpdateService,
 )
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
+from rodall_signage.services.weather_update_service import WeatherUpdateService
 from rodall_signage.sync.content_store import ContentStore
 from rodall_signage.sync.manifest_playlist_adapter import (
     ManifestPlaylistAdapter,
@@ -78,6 +79,11 @@ def build_context(settings: AppSettings) -> AppContext:
         store=cache_registry.exchange_rates,
         refresh_seconds=settings.exchange_rate_refresh_seconds,
     )
+    weather_update_service = WeatherUpdateService(
+        api_client=api_client,
+        store=cache_registry.weather,
+        refresh_seconds=settings.weather_refresh_seconds,
+    )
     lifecycle = LifecycleService(
         event_bus=event_bus,
         player=player,
@@ -86,6 +92,7 @@ def build_context(settings: AppSettings) -> AppContext:
         synchronization=synchronization,
         heartbeat=heartbeat,
         exchange_rate_update_service=exchange_rate_update_service,
+        weather_update_service=weather_update_service,
     )
 
     return AppContext(
@@ -101,6 +108,7 @@ def build_context(settings: AppSettings) -> AppContext:
         synchronization=synchronization,
         heartbeat=heartbeat,
         exchange_rate_update_service=exchange_rate_update_service,
+        weather_update_service=weather_update_service,
         cache_registry=cache_registry,
         cache_demo=cache_demo,
         lifecycle=lifecycle,

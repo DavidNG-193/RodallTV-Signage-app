@@ -15,6 +15,7 @@ from rodall_signage.services.exchange_rate_update_service import (
     ExchangeRateUpdateService,
 )
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
+from rodall_signage.services.weather_update_service import WeatherUpdateService
 from rodall_signage.sync.content_store import ContentStore
 from rodall_signage.sync.manifest_playlist_adapter import (
     ManifestPlaylistAdapter,
@@ -37,6 +38,7 @@ class AppContext:
     synchronization: SynchronizationService
     heartbeat: HeartbeatService
     exchange_rate_update_service: ExchangeRateUpdateService
+    weather_update_service: WeatherUpdateService
     cache_registry: CacheRegistry
     cache_demo: CacheDemoService
     lifecycle: LifecycleService

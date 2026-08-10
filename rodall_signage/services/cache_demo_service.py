@@ -18,14 +18,6 @@ class CacheDemoService:
         generated_at = datetime.now(timezone.utc)
         writes = (
             (
-                "clima",
-                lambda: self._registry.weather.write(
-                    DemoDataService.weather(),
-                    generated_at,
-                    generated_at + timedelta(minutes=30),
-                ),
-            ),
-            (
                 "referencias",
                 lambda: self._registry.references.write(
                     DemoDataService.references(),
