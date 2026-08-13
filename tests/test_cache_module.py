@@ -132,7 +132,7 @@ class CacheModuleTests(unittest.TestCase):
             results[1].envelope.payload.location_name,
             "Veracruz, VER",
         )
-        self.assertEqual(len(results[2].envelope.payload), 6)
+        self.assertEqual(len(results[2].envelope.payload.references), 3)
 
         for path in (
             self.registry.exchange_rates.path,
@@ -140,14 +140,7 @@ class CacheModuleTests(unittest.TestCase):
             self.registry.references.path,
         ):
             raw = json.loads(path.read_text(encoding="utf-8"))
-            expected_schema = (
-                2
-                if path in {
-                    self.registry.exchange_rates.path,
-                    self.registry.weather.path,
-                }
-                else 1
-            )
+            expected_schema = 2
             self.assertEqual(raw["schemaVersion"], expected_schema)
             self.assertTrue(raw["generatedAt"].endswith("Z"))
             self.assertTrue(raw["expiresAt"].endswith("Z"))
@@ -158,23 +151,25 @@ class CacheModuleTests(unittest.TestCase):
         self.demo.seed()
         self._save_rates()
         self._save_weather()
-        references = self.registry.references.read().envelope.payload
-        now = datetime.now(timezone.utc)
-        self.registry.references.write(
-            references,
-            generated_at=now - timedelta(days=2),
-            expires_at=now - timedelta(days=1),
-        )
+        path = self.registry.references.path
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        raw["generatedAt"] = (
+            datetime.now(timezone.utc) - timedelta(days=2)
+        ).isoformat().replace("+00:00", "Z")
+        raw["expiresAt"] = (
+            datetime.now(timezone.utc) - timedelta(days=1)
+        ).isoformat().replace("+00:00", "Z")
+        path.write_text(json.dumps(raw), encoding="utf-8")
 
         result = self.registry.references.read()
 
         self.assertEqual(result.freshness, CacheFreshness.EXPIRED)
         self.assertTrue(result.has_data)
-        self.assertEqual(len(result.envelope.payload), 6)
+        self.assertEqual(len(result.envelope.payload.references), 3)
         self.assertTrue(self.registry.references.path.exists())
         widget = ReferencesPanel()
-        widget.set_references(result.envelope.payload)
-        self.assertEqual(len(widget._references), 6)
+        widget.set_snapshot(result.envelope.payload)
+        self.assertEqual(len(widget._references), 3)
 
     def test_missing_cache_is_independent_from_other_stores(self) -> None:
         self.demo.seed()
@@ -273,11 +268,11 @@ class CacheModuleTests(unittest.TestCase):
 
         rate_widget.set_snapshot(rates.envelope.payload)
         weather_widget.set_weather(weather.envelope.payload)
-        reference_widget.set_references(references.envelope.payload)
+        reference_widget.set_snapshot(references.envelope.payload)
 
         self.assertEqual(len(rate_widget._rates), 1)
         self.assertEqual(weather_widget._location.text(), "Veracruz, VER")
-        self.assertEqual(len(reference_widget._references), 6)
+        self.assertEqual(len(reference_widget._references), 3)
 
 
 if __name__ == "__main__":

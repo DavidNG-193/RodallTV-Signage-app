@@ -98,6 +98,22 @@ class DeviceApiClient:
 
         return payload
 
+    def get_references(self) -> dict[str, Any]:
+        response = self._session().get(
+            self._url("/api/agent/references"),
+            headers=self._headers(),
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+        if not isinstance(payload, dict):
+            raise ValueError(
+                "La respuesta de referencias no es un objeto JSON."
+            )
+
+        return payload
+
     def download(self, download_url: str) -> requests.Response:
         response = self._session().get(
             self._absolute_or_relative(download_url),

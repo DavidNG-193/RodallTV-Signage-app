@@ -128,20 +128,17 @@ class MainWindow(QMainWindow):
         self._context.weather_update_service.availability_changed.connect(
             self._weather_card.set_cache_state
         )
+        self._context.reference_update_service.snapshot_changed.connect(
+            self._references_panel.set_snapshot
+        )
+        self._context.reference_update_service.availability_changed.connect(
+            self._references_panel.set_cache_state
+        )
 
     def _load_demo_data(self) -> None:
-        self._context.cache_demo.seed()
-
-        references = self._context.cache_registry.references.read()
-
-        self._references_panel.set_references(
-            references.envelope.payload
-            if references.envelope is not None
-            else []
-        )
         self._context.exchange_rate_update_service.publish_cached_value()
         self._context.weather_update_service.publish_cached_value()
-        self._context.cache_demo.log_status()
+        self._context.reference_update_service.publish_cached_value()
 
     def showEvent(self, event: QShowEvent) -> None:
         super().showEvent(event)
@@ -214,6 +211,7 @@ class MainWindow(QMainWindow):
 
         self._context.exchange_rate_update_service.start()
         self._context.weather_update_service.start()
+        self._context.reference_update_service.start()
 
     def _load_and_start_playlist(self) -> None:
         try:

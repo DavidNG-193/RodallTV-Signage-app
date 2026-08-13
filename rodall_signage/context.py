@@ -9,13 +9,13 @@ from rodall_signage.events import AppEventBus
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
-from rodall_signage.services.cache_demo_service import CacheDemoService
 from rodall_signage.services.heartbeat_service import HeartbeatService
 from rodall_signage.services.exchange_rate_update_service import (
     ExchangeRateUpdateService,
 )
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 from rodall_signage.services.weather_update_service import WeatherUpdateService
+from rodall_signage.services.reference_update_service import ReferenceUpdateService
 from rodall_signage.sync.content_store import ContentStore
 from rodall_signage.sync.manifest_playlist_adapter import (
     ManifestPlaylistAdapter,
@@ -39,6 +39,6 @@ class AppContext:
     heartbeat: HeartbeatService
     exchange_rate_update_service: ExchangeRateUpdateService
     weather_update_service: WeatherUpdateService
+    reference_update_service: ReferenceUpdateService
     cache_registry: CacheRegistry
-    cache_demo: CacheDemoService
     lifecycle: LifecycleService

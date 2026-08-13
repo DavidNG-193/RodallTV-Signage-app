@@ -14,6 +14,7 @@ from rodall_signage.services.exchange_rate_update_service import (
     ExchangeRateUpdateService,
 )
 from rodall_signage.services.weather_update_service import WeatherUpdateService
+from rodall_signage.services.reference_update_service import ReferenceUpdateService
 from rodall_signage.sync.synchronization_service import SynchronizationService
 
 
@@ -33,6 +34,7 @@ class LifecycleService(QObject):
         heartbeat: HeartbeatService,
         exchange_rate_update_service: ExchangeRateUpdateService,
         weather_update_service: WeatherUpdateService,
+        reference_update_service: ReferenceUpdateService,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -45,6 +47,7 @@ class LifecycleService(QObject):
         self._heartbeat = heartbeat
         self._exchange_rate_update_service = exchange_rate_update_service
         self._weather_update_service = weather_update_service
+        self._reference_update_service = reference_update_service
         self._is_shutting_down = False
 
     def mark_starting(self) -> None:
@@ -73,6 +76,7 @@ class LifecycleService(QObject):
         self._event_bus.publish_status("Cerrando aplicación...")
 
         operations = (
+            ("referencias", self._reference_update_service.stop),
             ("clima", self._weather_update_service.stop),
             ("tasas de cambio", self._exchange_rate_update_service.stop),
             ("heartbeat", self._heartbeat.stop),

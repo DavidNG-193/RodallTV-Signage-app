@@ -91,6 +91,7 @@ class AppSettings:
     manifest_path: Path
     exchange_rate_refresh_seconds: int
     weather_refresh_seconds: int
+    reference_refresh_seconds: int
 
     @classmethod
     def from_environment(cls) -> "AppSettings":
@@ -144,6 +145,10 @@ class AppSettings:
             weather_refresh_seconds=max(
                 _read_positive_int("RODALL_WEATHER_SECONDS", 900),
                 300,
+            ),
+            reference_refresh_seconds=max(
+                _read_positive_int("RODALL_REFERENCE_SECONDS", 60),
+                30,
             ),
         )
 

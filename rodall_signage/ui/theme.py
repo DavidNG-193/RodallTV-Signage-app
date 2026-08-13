@@ -9,8 +9,8 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
 
     return f"""
     QMainWindow, QWidget {{
-        background: #07101f;
-        color: #eef4ff;
+        background: #080807;
+        color: #f5f1e8;
         font-family: Arial;
     }}
     QLabel {{
@@ -18,8 +18,8 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
     }}
 
     QFrame#exchangeRateBar {{
-        background: #0b1424;
-        border-bottom: 1px solid #24334b;
+        background: #11110f;
+        border-bottom: 1px solid #8a6724;
     }}
     QWidget#ratesViewport,
     QWidget#ratesTrack,
@@ -28,46 +28,46 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         background: transparent;
     }}
     QLabel#rateSymbol {{
-        color: #93a0b5;
+        color: #b9ad96;
         font-size: {max(metrics.body_size - 2, 11)}px;
         letter-spacing: 1px;
     }}
     QLabel#rateValue {{
-        color: #f6f8fc;
+        color: #fffaf0;
         font-size: {metrics.body_size}px;
         font-weight: 800;
     }}
     QLabel#rateStaticDate {{
-        color: #7186a8;
-        background: #0b1424;
-        border-left: 1px solid #24334b;
+        color: #c8b681;
+        background: #11110f;
+        border-left: 1px solid #8a6724;
         font-size: {max(metrics.body_size - 2, 11)}px;
         padding: 0 12px;
     }}
     QLabel#rateUp {{
-        color: #2dd4bf;
+        color: #55d68b;
         font-size: {max(metrics.body_size - 2, 11)}px;
         font-weight: 700;
     }}
     QLabel#rateDown {{
-        color: #fb7185;
+        color: #ff6b70;
         font-size: {max(metrics.body_size - 2, 11)}px;
         font-weight: 700;
     }}
     QLabel#rateNeutral {{
-        color: #94a3b8;
+        color: #b9b5ad;
         font-size: {max(metrics.body_size - 2, 11)}px;
         font-weight: 700;
     }}
     QLabel#rateStale {{
-        color: #e7b454;
+        color: #e8bd59;
         font-size: {max(metrics.body_size - 2, 11)}px;
         font-weight: 700;
     }}
 
     QFrame#mediaPanel {{
-        background: #05080f;
-        border: 1px solid #2d405d;
+        background: #030302;
+        border: 1px solid #8a6724;
         border-radius: 12px;
     }}
 
@@ -128,97 +128,105 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
     }}
 
     QFrame#referencesPanel {{
-        background: #101a2e;
-        border: 1px solid #2a3b58;
+        background: #11110f;
+        border: 1px solid #a37a2d;
         border-radius: 16px;
     }}
     QLabel#cardTitle {{
-        color: #a9bddc;
+        color: #f0cf70;
         font-size: {max(metrics.title_size - 1, 12)}px;
         font-weight: 800;
         letter-spacing: 0px;
     }}
     QLabel#referencesCount {{
-        color: #7186a8;
+        color: #a99e8b;
         font-size: {small_text}px;
     }}
+    QLabel#referencesAvailability {{
+        color: #e8bd59;
+        font-size: {badge_text}px;
+        font-weight: 700;
+    }}
     QFrame#referenceItem {{
-        background: #0b1424;
-        border: 1px solid #263a58;
+        background: #181714;
+        border: 1px solid #514323;
         border-radius: 11px;
     }}
     QLabel#referenceCodeBadge {{
-        color: #7689a6;
-        background: #09111f;
-        border: 1px solid #263a58;
+        color: #e0c979;
+        background: #0d0d0b;
+        border: 1px solid #685326;
         border-radius: 5px;
         padding: 3px 5px;
-        font-size: {badge_text}px;
-        font-family: Consolas;
+        font-size: {max(badge_text - 2, 9)}px;
+        font-family: "DejaVu Sans Mono", "Liberation Mono", Consolas, monospace;
     }}
     QLabel#referenceTitle {{
-        color: #f2f5fb;
+        color: #fffaf0;
         font-size: {max(metrics.body_size - 2, 11)}px;
         font-weight: 800;
     }}
     QLabel#referenceLocation {{
-        color: #8493ac;
+        color: #b7ad9b;
         font-size: {badge_text}px;
     }}
     QLabel#operationImport {{
-        color: #e7b454;
-        background: #302b24;
+        color: #f1c75b;
+        background: #352b17;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
     QLabel#operationExport {{
-        color: #2dd4bf;
-        background: #123036;
+        color: #d8dde2;
+        background: #292b2d;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusDelivered {{
-        color: #2dd4bf;
-        background: #0b3437;
+    QLabel#statusPositive {{
+        color: #61e295;
+        background: #123421;
+        border: 1px solid #276a43;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusPending {{
-        color: #fb7185;
-        background: #392337;
+    QLabel#statusNegative {{
+        color: #ff767b;
+        background: #3b1719;
+        border: 1px solid #762e32;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusProgress {{
-        color: #e7b454;
-        background: #302b24;
+    QLabel#statusNeutral {{
+        color: #d6d2ca;
+        background: #2a2926;
+        border: 1px solid #54514b;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
     QLabel#emptyState {{
-        color: #71839e;
+        color: #a59b89;
         font-size: {metrics.body_size}px;
     }}
 
     QLabel#applicationStatusBar {{
-        background: #0b1424;
-        color: #90a3c0;
-        border-top: 1px solid #26334a;
+        background: #11110f;
+        color: #b7ad9b;
+        border-top: 1px solid #8a6724;
         padding-left: 14px;
         font-size: {small_text}px;
     }}
     QMainWindow[appState="Degraded"] QLabel#applicationStatusBar {{
-        color: #f6c85f;
+        color: #e8bd59;
     }}
 
     QScrollArea,

@@ -1,6 +1,6 @@
 from __future__ import annotations
-from rodall_signage.models import DailyReference, WeatherSnapshot
-from datetime import datetime, timedelta, timezone
+from rodall_signage.models import ReferenceItem, ReferenceSnapshot, WeatherSnapshot
+from datetime import date, datetime, timedelta, timezone
 
 class DemoDataService:
     @staticmethod
@@ -23,30 +23,38 @@ class DemoDataService:
         )
 
     @staticmethod
-    def references() -> list[DailyReference]:
-        return [
-            DailyReference(
-                "1", "REF-0821", "Grupo Industrial del Golfo", 1,
-                "Veracruz", "Importación", "DESPACHADO",
+    def references() -> ReferenceSnapshot:
+        now = datetime.now(timezone.utc)
+        values = (
+            ("1", "REF-0821", "Grupo Industrial del Golfo", "I", "Importación", "Veracruz", "DESPACHADO"),
+            ("2", "REF-0822", "Comercializadora del Centro", "E", "Exportación", "Manzanillo", "EN TRÁMITE"),
+            ("3", "REF-0823", "Distribuidora Nacional", "I", "Importación", "Veracruz", "PEND. DOCS"),
+        )
+        return ReferenceSnapshot(
+            fetched_at_utc=now,
+            references=tuple(
+                ReferenceItem(
+                    id=item_id,
+                    reference_number=number,
+                    reference_date=date.today(),
+                    client=client,
+                    operation_code=operation_code,
+                    operation=operation,
+                    document="A1",
+                    customs_office_number=430,
+                    customs_office=customs_office,
+                    status_code="A",
+                    status=status,
+                    last_external_update_at=now,
+                )
+                for (
+                    item_id,
+                    number,
+                    client,
+                    operation_code,
+                    operation,
+                    customs_office,
+                    status,
+                ) in values
             ),
-            DailyReference(
-                "2", "REF-0822", "Comercializadora del Centro", 2,
-                "Manzanillo", "Exportación", "EN TRÁMITE",
-            ),
-            DailyReference(
-                "3", "REF-0823", "Distribuidora Nacional", 3,
-                "Veracruz", "Importación", "PEND. DOCS",
-            ),
-            DailyReference(
-                "4", "REF-0824", "Maquiladora Fronteriza", 4,
-                "Nuevo Laredo", "Exportación", "DESPACHADO",
-            ),
-            DailyReference(
-                "5", "REF-0825", "Importadora del Sureste", 5,
-                "Veracruz", "Importación", "EN TRÁMITE",
-            ),
-            DailyReference(
-                "6", "REF-0826", "Agroexportaciones MX", 6,
-                "Manzanillo", "Exportación", "DESPACHADO",
-            ),
-        ]
+        )

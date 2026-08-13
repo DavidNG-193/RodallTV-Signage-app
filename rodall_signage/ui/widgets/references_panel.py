@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -11,18 +12,25 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from rodall_signage.models import DailyReference
+from rodall_signage.models import ReferenceItem, ReferenceSnapshot
 
 
 class ReferencesPanel(QFrame):
-    _REPEAT_COUNT = 4
+    # Varias copias garantizan recorrido suficiente incluso en pantallas altas
+    # con pocas referencias; el reinicio ocurre al comenzar la segunda copia.
+    _REPEAT_COUNT = 8
+    _REFERENCE_WIDTH = 92
+    _OPERATION_WIDTH = 106
+    _ITEM_HORIZONTAL_MARGINS = 22
+    _ROW_SPACING = 7
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("referencesPanel")
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
 
-        self._references: list[DailyReference] = []
+        self._references: list[ReferenceItem] = []
+        self._cache_state = "missing"
         self._cycle_height = 0
         self._first_item: QFrame | None = None
         self._second_copy_first_item: QFrame | None = None
@@ -39,11 +47,14 @@ class ReferencesPanel(QFrame):
         self._count_label = QLabel("0 activas")
         self._count_label.setObjectName("referencesCount")
         self._count_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._availability_label = QLabel("")
+        self._availability_label.setObjectName("referencesAvailability")
+        self._availability_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         header_layout.addWidget(title, 1)
         header_layout.addWidget(self._count_label, 0)
 
-        self._empty_label = QLabel("No hay referencias para mostrar.")
+        self._empty_label = QLabel("No hay referencias disponibles.")
         self._empty_label.setObjectName("emptyState")
         self._empty_label.setWordWrap(True)
 
@@ -65,11 +76,18 @@ class ReferencesPanel(QFrame):
         self._scroll_timer.timeout.connect(self._advance_references)
 
         self._root_layout.addLayout(header_layout)
+        self._root_layout.addWidget(self._availability_label)
         self._root_layout.addWidget(self._empty_label)
         self._root_layout.addWidget(self._scroll, 1)
-        self.set_references([])
+        self.show_empty_state()
 
-    def set_references(self, references: list[DailyReference]) -> None:
+    def set_snapshot(self, snapshot: ReferenceSnapshot) -> None:
+        self.set_references(snapshot.references)
+
+    def set_references(
+        self,
+        references: tuple[ReferenceItem, ...] | list[ReferenceItem],
+    ) -> None:
         self._scroll_timer.stop()
         self._scroll.verticalScrollBar().setValue(0)
         self._first_item = None
@@ -82,18 +100,18 @@ class ReferencesPanel(QFrame):
                 widget.hide()
                 widget.deleteLater()
 
-        self._references = sorted(references, key=lambda item: item.sequence)
-        dispatched = sum(
-            "DESPACH" in reference.status.upper()
-            for reference in self._references
+        self._references = list(references)
+        concluded = sum(
+            self._is_concluded(reference) for reference in self._references
         )
         self._count_label.setText(
-            f"{len(self._references)}  ·  {dispatched} despachadas"
+            f"{len(self._references)}  -  {concluded} concluidas"
         )
         self._empty_label.setVisible(not self._references)
         self._scroll.setVisible(bool(self._references))
 
         if not self._references:
+            self._empty_label.setText("No hay referencias activas.")
             self._cycle_height = 0
             return
 
@@ -108,7 +126,25 @@ class ReferencesPanel(QFrame):
 
         self._list_layout.addStretch(1)
         self._list_layout.activate()
+        self._update_column_widths(self.width())
         QTimer.singleShot(0, self._start_scrolling)
+
+    def set_cache_state(self, state: str) -> None:
+        self._cache_state = state.casefold()
+        if self._cache_state in {"expired", "stale"}:
+            self._availability_label.setText("Sin actualización reciente")
+        else:
+            self._availability_label.clear()
+
+        if self._cache_state in {"missing", "invalid"} and not self._references:
+            self.show_empty_state()
+
+    def show_empty_state(self) -> None:
+        self._references = []
+        self._count_label.setText("0 activas")
+        self._empty_label.setText("No hay referencias disponibles.")
+        self._empty_label.setVisible(True)
+        self._scroll.setVisible(False)
 
     def set_content_margins(self, padding: int) -> None:
         self._root_layout.setContentsMargins(
@@ -117,73 +153,101 @@ class ReferencesPanel(QFrame):
             padding,
             padding,
         )
+        self._update_column_widths(self.width())
 
-    def _build_reference_item(self, reference: DailyReference) -> QFrame:
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._update_column_widths(event.size().width())
+
+    def _update_column_widths(self, panel_width: int) -> None:
+        margins = self._root_layout.contentsMargins()
+        available = max(
+            panel_width
+            - margins.left()
+            - margins.right()
+            - self._ITEM_HORIZONTAL_MARGINS
+            - self._ROW_SPACING,
+            0,
+        )
+        reference_width = max(self._REFERENCE_WIDTH, round(available * 0.35))
+        operation_width = max(self._OPERATION_WIDTH, round(available * 0.37))
+
+        for code in self.findChildren(QLabel, "referenceCodeBadge"):
+            code.setFixedWidth(reference_width)
+        for operation in self.findChildren(QLabel, "operationImport"):
+            operation.setFixedWidth(operation_width)
+        for operation in self.findChildren(QLabel, "operationExport"):
+            operation.setFixedWidth(operation_width)
+
+    def _build_reference_item(self, reference: ReferenceItem) -> QFrame:
         frame = QFrame()
         frame.setObjectName("referenceItem")
-        frame.setMinimumHeight(64)
+        frame.setMinimumHeight(96)
 
-        layout = QHBoxLayout(frame)
+        layout = QVBoxLayout(frame)
         layout.setContentsMargins(11, 9, 11, 9)
-        layout.setSpacing(9)
+        layout.setSpacing(4)
 
-        code = QLabel(reference.code)
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(7)
+
+        code = QLabel(reference.reference_number)
         code.setObjectName("referenceCodeBadge")
         code.setAlignment(Qt.AlignCenter)
-        code.setFixedWidth(76)
+        code.setToolTip(reference.reference_number)
+        code.setFixedWidth(self._REFERENCE_WIDTH)
+        code.setWordWrap(True)
 
-        identity_layout = QVBoxLayout()
-        identity_layout.setContentsMargins(0, 0, 0, 0)
-        identity_layout.setSpacing(0)
-
-        display_description = (
-            reference.description
-            if len(reference.description) <= 18
-            else f"{reference.description[:17]}…"
-        )
-        description = QLabel(display_description)
+        description = QLabel(reference.client)
         description.setObjectName("referenceTitle")
-        description.setToolTip(reference.description)
-        description.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
-        location = QLabel(reference.location or "Sin ubicación")
-        location.setObjectName("referenceLocation")
-        identity_layout.addWidget(description)
-        identity_layout.addWidget(location)
+        description.setToolTip(reference.client)
+        description.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        description.setWordWrap(True)
 
-        badges_layout = QVBoxLayout()
-        badges_layout.setContentsMargins(0, 0, 0, 0)
-        badges_layout.setSpacing(3)
+        status = QLabel(reference.status)
+        status.setObjectName(self._status_object_name(reference))
+        status.setAlignment(Qt.AlignCenter)
+        status.setToolTip(reference.status)
+        status.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        status.setWordWrap(True)
+
+        top_row.addWidget(code, 0)
+        top_row.addWidget(status, 1)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(7)
+
+        location_text = reference.customs_office or "Sin aduana"
+        if reference.document:
+            location_text = f"{location_text} · {reference.document}"
+        location = QLabel(location_text)
+        location.setToolTip(location_text)
+        location.setObjectName("referenceLocation")
+        location.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        location.setWordWrap(True)
 
         operation = QLabel(
-            ("▲  " if reference.operation_type.casefold().startswith("export") else "▼  ")
-            + reference.operation_type
+            ("▲  " if reference.operation_code.upper() == "E" else "▼  ")
+            + reference.operation
         )
         operation.setObjectName(
             "operationExport"
-            if reference.operation_type.casefold().startswith("export")
+            if reference.operation_code.upper() == "E"
             else "operationImport"
         )
         operation.setAlignment(Qt.AlignCenter)
-        operation.setFixedWidth(102)
+        operation.setToolTip(reference.operation)
+        operation.setFixedWidth(self._OPERATION_WIDTH)
+        operation.setWordWrap(True)
 
-        status = QLabel(reference.status)
-        normalized_status = reference.status.upper()
-        status.setObjectName(
-            "statusDelivered"
-            if "DESPACH" in normalized_status
-            else "statusPending"
-            if "PEND" in normalized_status
-            else "statusProgress"
-        )
-        status.setAlignment(Qt.AlignCenter)
-        status.setFixedWidth(92)
+        bottom_row.addWidget(operation, 0)
+        bottom_row.addWidget(location, 1)
 
-        badges_layout.addWidget(operation)
-        badges_layout.addWidget(status)
-
-        layout.addWidget(code, 0)
-        layout.addLayout(identity_layout, 1)
-        layout.addLayout(badges_layout, 0)
+        layout.addLayout(top_row)
+        layout.addWidget(description)
+        layout.addLayout(bottom_row)
         return frame
 
     def _start_scrolling(self) -> None:
@@ -196,7 +260,7 @@ class ReferencesPanel(QFrame):
                 - self._first_item.geometry().y()
             )
 
-        if self._cycle_height > 0 and self.isVisible():
+        if self._cycle_height > 0:
             self._scroll_timer.start()
 
     def _advance_references(self) -> None:
@@ -204,7 +268,44 @@ class ReferencesPanel(QFrame):
             return
 
         scroll_bar = self._scroll.verticalScrollBar()
+        maximum = scroll_bar.maximum()
+
+        if maximum <= 0:
+            return
+
+        loop_at = min(self._cycle_height, maximum)
         next_value = scroll_bar.value() + 1
-        scroll_bar.setValue(
-            0 if next_value >= self._cycle_height else next_value
+        scroll_bar.setValue(0 if next_value >= loop_at else next_value)
+
+    @staticmethod
+    def _status_object_name(reference: ReferenceItem) -> str:
+        normalized = f"{reference.status_code} {reference.status}".upper()
+
+        positive_keywords = (
+            "DESPACH",
+            "LIBER",
+            "ENTREG",
+            "COMPLET",
+            "CONCLUID",
+            "FINALIZ",
+            "AUTORIZ",
         )
+        negative_keywords = (
+            "PEND",
+            "RECHAZ",
+            "ERROR",
+            "CANCEL",
+            "BLOQUE",
+            "FALTA",
+            "VENC",
+        )
+
+        if any(keyword in normalized for keyword in positive_keywords):
+            return "statusPositive"
+        if any(keyword in normalized for keyword in negative_keywords):
+            return "statusNegative"
+        return "statusNeutral"
+
+    @staticmethod
+    def _is_concluded(reference: ReferenceItem) -> bool:
+        return ReferencesPanel._status_object_name(reference) == "statusPositive"

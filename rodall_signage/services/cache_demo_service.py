@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 import logging
 
 from rodall_signage.cache.cache_registry import CacheRegistry
@@ -15,14 +14,11 @@ class CacheDemoService:
         self._registry = registry
 
     def seed(self) -> None:
-        generated_at = datetime.now(timezone.utc)
         writes = (
             (
                 "referencias",
-                lambda: self._registry.references.write(
-                    DemoDataService.references(),
-                    generated_at,
-                    generated_at + timedelta(days=1),
+                lambda: self._registry.references.save(
+                    DemoDataService.references()
                 ),
             ),
         )

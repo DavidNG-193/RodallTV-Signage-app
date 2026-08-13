@@ -15,13 +15,13 @@ from rodall_signage.logging_config import configure_logging
 from rodall_signage.player.mpv_controller import MpvController
 from rodall_signage.player.playback_coordinator import PlaybackCoordinator
 from rodall_signage.services.lifecycle_service import LifecycleService
-from rodall_signage.services.cache_demo_service import CacheDemoService
 from rodall_signage.services.heartbeat_service import HeartbeatService
 from rodall_signage.services.exchange_rate_update_service import (
     ExchangeRateUpdateService,
 )
 from rodall_signage.services.local_playlist_loader import LocalPlaylistLoader
 from rodall_signage.services.weather_update_service import WeatherUpdateService
+from rodall_signage.services.reference_update_service import ReferenceUpdateService
 from rodall_signage.sync.content_store import ContentStore
 from rodall_signage.sync.manifest_playlist_adapter import (
     ManifestPlaylistAdapter,
@@ -71,9 +71,14 @@ def build_context(settings: AppSettings) -> AppContext:
             settings.cache_dir / "exchange_rates.json"
         ),
         weather=WeatherStore(settings.cache_dir / "weather.json"),
-        references=ReferenceStore(settings.cache_dir / "references.json"),
+        references=ReferenceStore(
+            settings.cache_dir / "references.json",
+            cache_lifetime_seconds=max(
+                settings.reference_refresh_seconds * 3,
+                300,
+            ),
+        ),
     )
-    cache_demo = CacheDemoService(cache_registry)
     exchange_rate_update_service = ExchangeRateUpdateService(
         api_client=api_client,
         store=cache_registry.exchange_rates,
@@ -84,6 +89,11 @@ def build_context(settings: AppSettings) -> AppContext:
         store=cache_registry.weather,
         refresh_seconds=settings.weather_refresh_seconds,
     )
+    reference_update_service = ReferenceUpdateService(
+        api_client=api_client,
+        store=cache_registry.references,
+        refresh_seconds=settings.reference_refresh_seconds,
+    )
     lifecycle = LifecycleService(
         event_bus=event_bus,
         player=player,
@@ -93,6 +103,7 @@ def build_context(settings: AppSettings) -> AppContext:
         heartbeat=heartbeat,
         exchange_rate_update_service=exchange_rate_update_service,
         weather_update_service=weather_update_service,
+        reference_update_service=reference_update_service,
     )
 
     return AppContext(
@@ -109,8 +120,8 @@ def build_context(settings: AppSettings) -> AppContext:
         heartbeat=heartbeat,
         exchange_rate_update_service=exchange_rate_update_service,
         weather_update_service=weather_update_service,
+        reference_update_service=reference_update_service,
         cache_registry=cache_registry,
-        cache_demo=cache_demo,
         lifecycle=lifecycle,
     )
 
