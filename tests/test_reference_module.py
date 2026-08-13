@@ -171,10 +171,10 @@ class ReferenceModuleTests(unittest.TestCase):
         )
         self.assertEqual(
             ReferencesPanel._status_object_name(concluded),
-            "statusPositive",
+            "statusPrePositive",
         )
         self.assertTrue(ReferencesPanel._is_concluded(delivered))
-        self.assertTrue(ReferencesPanel._is_concluded(concluded))
+        self.assertFalse(ReferencesPanel._is_concluded(concluded))
         self.assertFalse(ReferencesPanel._is_concluded(negative))
         self.assertEqual(
             ReferencesPanel._status_object_name(negative),
@@ -203,7 +203,7 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertGreater(code.width(), panel._REFERENCE_WIDTH)
         self.assertGreater(operation.width(), panel._OPERATION_WIDTH)
 
-    def test_counter_includes_every_positive_concluded_status(self) -> None:
+    def test_counter_excludes_prepositive_statuses(self) -> None:
         original = parse_reference_snapshot(payload()).references[0]
         references = [
             original.__class__(
@@ -231,7 +231,7 @@ class ReferenceModuleTests(unittest.TestCase):
         panel = ReferencesPanel()
         panel.set_references(references)
 
-        self.assertEqual(panel._count_label.text(), "2  ·  2 concluidas")
+        self.assertEqual(panel._count_label.text(), "2  -  1 concluidas")
 
     def test_scroll_restarts_at_real_scrollbar_limit(self) -> None:
         panel = ReferencesPanel()
