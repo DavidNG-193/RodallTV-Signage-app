@@ -186,6 +186,15 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         font-size: {badge_text}px;
         font-weight: 800;
     }}
+    QLabel#statusPrePositive {{
+        color: #61BBE2;
+        background: #0B2E3C;
+        border: 1px solid #19688A;
+        border-radius: 8px;
+        padding: 2px 7px;
+        font-size: {badge_text}px;
+        font-weight: 800;
+    }}
     QLabel#statusPositive {{
         color: #61e295;
         background: #123421;

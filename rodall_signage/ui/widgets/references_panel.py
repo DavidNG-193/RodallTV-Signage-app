@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QElapsedTimer, QTimer, Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
@@ -23,6 +23,8 @@ class ReferencesPanel(QFrame):
     _OPERATION_WIDTH = 106
     _ITEM_HORIZONTAL_MARGINS = 22
     _ROW_SPACING = 7
+    _FRAME_INTERVAL_MS = 34
+    _SCROLL_SPEED_PX_PER_SECOND = 1000 / 34
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -32,6 +34,7 @@ class ReferencesPanel(QFrame):
         self._references: list[ReferenceItem] = []
         self._cache_state = "missing"
         self._cycle_height = 0
+        self._scroll_position = 0.0
         self._first_item: QFrame | None = None
         self._second_copy_first_item: QFrame | None = None
 
@@ -72,8 +75,10 @@ class ReferencesPanel(QFrame):
         self._scroll.setWidget(self._list_widget)
 
         self._scroll_timer = QTimer(self)
-        self._scroll_timer.setInterval(34)
+        self._scroll_timer.setInterval(self._FRAME_INTERVAL_MS)
+        self._scroll_timer.setTimerType(Qt.PreciseTimer)
         self._scroll_timer.timeout.connect(self._advance_references)
+        self._scroll_clock = QElapsedTimer()
 
         self._root_layout.addLayout(header_layout)
         self._root_layout.addWidget(self._availability_label)
@@ -89,6 +94,8 @@ class ReferencesPanel(QFrame):
         references: tuple[ReferenceItem, ...] | list[ReferenceItem],
     ) -> None:
         self._scroll_timer.stop()
+        self._scroll_clock.invalidate()
+        self._scroll_position = 0.0
         self._scroll.verticalScrollBar().setValue(0)
         self._first_item = None
         self._second_copy_first_item = None
@@ -261,9 +268,24 @@ class ReferencesPanel(QFrame):
             )
 
         if self._cycle_height > 0:
+            self._scroll_position = float(
+                self._scroll.verticalScrollBar().value()
+            )
+            self._scroll_clock.start()
             self._scroll_timer.start()
 
     def _advance_references(self) -> None:
+        elapsed_ms = self._FRAME_INTERVAL_MS
+        if self._scroll_clock.isValid():
+            elapsed_ms = max(self._scroll_clock.restart(), 1)
+        else:
+            self._scroll_position = float(
+                self._scroll.verticalScrollBar().value()
+            )
+
+        self._advance_references_by(elapsed_ms)
+
+    def _advance_references_by(self, elapsed_ms: int) -> None:
         if self._cycle_height <= 0:
             return
 
@@ -274,8 +296,13 @@ class ReferencesPanel(QFrame):
             return
 
         loop_at = min(self._cycle_height, maximum)
-        next_value = scroll_bar.value() + 1
-        scroll_bar.setValue(0 if next_value >= loop_at else next_value)
+        distance = self._SCROLL_SPEED_PX_PER_SECOND * elapsed_ms / 1000
+        next_position = self._scroll_position + distance
+        if next_position >= loop_at:
+            next_position %= loop_at
+
+        self._scroll_position = next_position
+        scroll_bar.setValue(round(self._scroll_position))
 
     @staticmethod
     def _status_object_name(reference: ReferenceItem) -> str:
@@ -286,9 +313,13 @@ class ReferencesPanel(QFrame):
             "LIBER",
             "ENTREG",
             "COMPLET",
-            "CONCLUID",
-            "FINALIZ",
+            "VALIDA",
+            "FINALIZ"
+        )
+        prepositive_keywords = (
+            "PREVIO",
             "AUTORIZ",
+            "CONCLUID"
         )
         negative_keywords = (
             "PEND",
@@ -302,6 +333,8 @@ class ReferencesPanel(QFrame):
 
         if any(keyword in normalized for keyword in positive_keywords):
             return "statusPositive"
+        if any(keyword in normalized for keyword in prepositive_keywords):
+            return "statusPrePositive"
         if any(keyword in normalized for keyword in negative_keywords):
             return "statusNegative"
         return "statusNeutral"

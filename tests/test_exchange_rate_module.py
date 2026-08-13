@@ -149,6 +149,14 @@ class ExchangeRateModuleTests(unittest.TestCase):
         self.assertEqual(update_lines[1], "BANXICO 05 AGO.")
         self.assertNotIn("05/08/2026", visible_text)
 
+    def test_ticker_catches_up_after_a_delayed_frame(self) -> None:
+        widget = ExchangeRateBar()
+        widget._cycle_width = 500
+
+        widget._advance_ticker_by(120)
+
+        self.assertAlmostEqual(widget._offset, 5.0)
+
 
 if __name__ == "__main__":
     unittest.main()

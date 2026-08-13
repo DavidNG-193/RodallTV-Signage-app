@@ -244,6 +244,16 @@ class ReferenceModuleTests(unittest.TestCase):
 
         self.assertEqual(scroll_bar.value(), 0)
 
+    def test_scroll_catches_up_after_a_delayed_frame(self) -> None:
+        panel = ReferencesPanel()
+        scroll_bar = panel._scroll.verticalScrollBar()
+        scroll_bar.setRange(0, 500)
+        panel._cycle_height = 500
+
+        panel._advance_references_by(102)
+
+        self.assertEqual(scroll_bar.value(), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

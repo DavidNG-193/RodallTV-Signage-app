@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PySide6.QtCore import QEvent, QTimer, Qt
+from PySide6.QtCore import QElapsedTimer, QEvent, QTimer, Qt
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -16,6 +16,8 @@ from rodall_signage.models import ExchangeRate, ExchangeRateSnapshot
 
 class ExchangeRateBar(QFrame):
     _REPEAT_COUNT = 6
+    _FRAME_INTERVAL_MS = 33
+    _SCROLL_SPEED_PX_PER_SECOND = 1000 / 24
     _MONTHS = (
         "ENE",
         "FEB",
@@ -39,7 +41,7 @@ class ExchangeRateBar(QFrame):
         self._rates: list[ExchangeRate] = []
         self._snapshot: ExchangeRateSnapshot | None = None
         self._cache_state = "missing"
-        self._offset = 0
+        self._offset = 0.0
         self._cycle_width = 0
         self._track: QWidget | None = None
         self._first_group: QWidget | None = None
@@ -66,8 +68,10 @@ class ExchangeRateBar(QFrame):
         root_layout.addWidget(self._effective_date)
 
         self._scroll_timer = QTimer(self)
-        self._scroll_timer.setInterval(24)
+        self._scroll_timer.setInterval(self._FRAME_INTERVAL_MS)
+        self._scroll_timer.setTimerType(Qt.PreciseTimer)
         self._scroll_timer.timeout.connect(self._advance_ticker)
+        self._scroll_clock = QElapsedTimer()
 
         self.show_empty_state()
 
@@ -134,7 +138,8 @@ class ExchangeRateBar(QFrame):
 
     def _replace_track(self, empty_message: str | None = None) -> None:
         self._scroll_timer.stop()
-        self._offset = 0
+        self._scroll_clock.invalidate()
+        self._offset = 0.0
         self._cycle_width = 0
         self._first_group = None
 
@@ -242,12 +247,22 @@ class ExchangeRateBar(QFrame):
 
         self._position_track()
         if self._cycle_width > 0 and self.isVisible():
+            self._scroll_clock.start()
             self._scroll_timer.start()
 
     def _advance_ticker(self) -> None:
+        elapsed_ms = self._FRAME_INTERVAL_MS
+        if self._scroll_clock.isValid():
+            elapsed_ms = max(self._scroll_clock.restart(), 1)
+
+        self._advance_ticker_by(elapsed_ms)
+
+    def _advance_ticker_by(self, elapsed_ms: int) -> None:
         if self._track is None or self._cycle_width <= 0:
             return
-        self._offset = (self._offset + 1) % self._cycle_width
+
+        distance = self._SCROLL_SPEED_PX_PER_SECOND * elapsed_ms / 1000
+        self._offset = (self._offset + distance) % self._cycle_width
         self._position_track()
 
     def _position_track(self) -> None:
@@ -257,4 +272,4 @@ class ExchangeRateBar(QFrame):
         track_height = max(size_hint.height(), self._viewport.height())
         self._track.resize(size_hint.width(), track_height)
         y = (self._viewport.height() - track_height) // 2
-        self._track.move(-self._offset, y)
+        self._track.move(-round(self._offset), y)

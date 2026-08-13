@@ -74,6 +74,9 @@ class AppSettings:
     app_name: str
     environment: str
     mpv_executable: str
+    mpv_hwdec: str
+    mpv_profile: str
+    mpv_gpu_dumb_mode: bool
     log_level: str
     windowed: bool
     test_media_path: Path | None
@@ -120,6 +123,17 @@ class AppSettings:
             app_name="RodallTV Signage",
             environment=os.getenv("RODALL_APP_ENV", "development").strip(),
             mpv_executable=mpv_executable,
+            mpv_hwdec=(
+                os.getenv("RODALL_MPV_HWDEC", "auto-safe").strip()
+                or "auto-safe"
+            ),
+            mpv_profile=(
+                os.getenv("RODALL_MPV_PROFILE", "fast").strip() or "fast"
+            ),
+            mpv_gpu_dumb_mode=_read_bool(
+                "RODALL_MPV_GPU_DUMB_MODE",
+                True,
+            ),
             log_level=os.getenv("RODALL_LOG_LEVEL", "INFO").strip().upper(),
             windowed=_read_bool("RODALL_WINDOWED", True),
             test_media_path=media_path,

@@ -68,10 +68,40 @@ class MpvController(QObject):
 
         self._cleanup_stale_socket()
 
-        arguments = [
+        arguments = self._build_arguments(window_id)
+
+        self._connect_attempts = 0
+        self._is_stopping = False
+        self._change_state(MpvState.STARTING)
+
+        logger.info(
+            "Iniciando mpv. executable=%s window_id=%s ipc=%s "
+            "hwdec=%s profile=%s gpu_dumb_mode=%s",
+            self._settings.mpv_executable,
+            window_id,
+            self._settings.ipc_argument,
+            self._settings.mpv_hwdec,
+            self._settings.mpv_profile,
+            self._settings.mpv_gpu_dumb_mode,
+        )
+
+        self._process.setProgram(self._settings.mpv_executable)
+        self._process.setArguments(arguments)
+        self._process.start()
+
+    def _build_arguments(self, window_id: int) -> list[str]:
+        return [
             f"--wid={window_id}",
             "--idle=yes",
             "--force-window=yes",
+            # mpv desactiva la decodificación por hardware de forma
+            # predeterminada. En Raspberry eso puede ocupar el CPU completo y
+            # quitarle tiempo a los repintados de Qt.
+            f"--hwdec={self._settings.mpv_hwdec}",
+            "--vo=gpu",
+            f"--profile={self._settings.mpv_profile}",
+            "--gpu-dumb-mode="
+            + ("yes" if self._settings.mpv_gpu_dumb_mode else "no"),
             # El coordinador administra el bucle. Mantener un video abierto al
             # llegar al EOF deja ``pause=yes`` en algunas versiones de mpv
             # para Raspberry Pi y el segundo ciclo puede quedar negro.
@@ -90,21 +120,6 @@ class MpvController(QObject):
             "--video-unscaled=no",
             f"--input-ipc-server={self._settings.ipc_argument}",
         ]
-
-        self._connect_attempts = 0
-        self._is_stopping = False
-        self._change_state(MpvState.STARTING)
-
-        logger.info(
-            "Iniciando mpv. executable=%s window_id=%s ipc=%s",
-            self._settings.mpv_executable,
-            window_id,
-            self._settings.ipc_argument,
-        )
-
-        self._process.setProgram(self._settings.mpv_executable)
-        self._process.setArguments(arguments)
-        self._process.start()
 
     def load(self, media_path: Path) -> None:
         resolved_path = media_path.expanduser().resolve()
@@ -203,6 +218,7 @@ class MpvController(QObject):
         self.send_command(["observe_property", 2, "pause"])
         self.send_command(["observe_property", 3, "eof-reached"])
         self.send_command(["observe_property", 4, "media-title"])
+        self.send_command(["observe_property", 5, "hwdec-current"])
 
     def _read_ipc_messages(self) -> None:
         self._read_buffer += bytes(self._socket.readAll())
@@ -227,6 +243,23 @@ class MpvController(QObject):
                     raw=message,
                 )
             )
+
+            if (
+                message.get("event") == "property-change"
+                and message.get("name") == "hwdec-current"
+                and message.get("data") is not None
+            ):
+                hwdec = str(message["data"])
+                if hwdec == "no":
+                    logger.warning(
+                        "mpv está decodificando video por CPU; no se "
+                        "encontró un backend de hardware compatible."
+                    )
+                else:
+                    logger.info(
+                        "Decodificación de video por hardware activa: %s",
+                        hwdec,
+                    )
 
             if (
                 message.get("event") == "property-change"
