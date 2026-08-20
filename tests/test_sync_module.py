@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+import gc
 from datetime import datetime, timezone
 from pathlib import Path
 import shutil
+from threading import Thread
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 import requests
 
 from PySide6.QtCore import QCoreApplication, QEventLoop, QTimer
@@ -55,10 +58,17 @@ class FakeJsonResponse:
     def json(self) -> dict:
         return self._payload
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args) -> None:
+        return None
+
 
 class FakeSession:
     def __init__(self) -> None:
         self.calls = []
+        self.closed = False
 
     def post(self, url: str, **kwargs):
         self.calls.append(("POST", url, kwargs))
@@ -90,6 +100,9 @@ class FakeSession:
                 "requiresSync": True,
             }
         )
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class FakeApiClient:
@@ -494,6 +507,37 @@ class SyncModuleTests(unittest.TestCase):
             report_call[2]["headers"]["X-Device-Token"],
             "secret-token",
         )
+
+    def test_api_client_closes_sessions_from_expired_worker_threads(
+        self,
+    ) -> None:
+        settings = SimpleNamespace(
+            api_base_url="http://backend:5026",
+            device_id="device-1",
+            device_token="secret-token",
+        )
+        client = DeviceApiClient(settings)
+        sessions: list[FakeSession] = []
+
+        def create_session() -> FakeSession:
+            session = FakeSession()
+            sessions.append(session)
+            return session
+
+        with patch(
+            "rodall_signage.api.device_api_client.requests.Session",
+            side_effect=create_session,
+        ):
+            for _ in range(5):
+                thread = Thread(target=client.heartbeat)
+                thread.start()
+                thread.join()
+                del thread
+                gc.collect()
+
+        self.assertEqual(len(sessions), 5)
+        self.assertTrue(all(session.closed for session in sessions))
+        self.assertEqual(len(client._session_owners), 0)
 
 
 if __name__ == "__main__":

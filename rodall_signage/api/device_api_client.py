@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from threading import Lock, local
 from typing import Any
+from weakref import WeakSet
 
 import requests
 
@@ -18,23 +19,45 @@ from rodall_signage.config import AppSettings
 logger = logging.getLogger(__name__)
 
 
+class _ThreadSessionOwner:
+    """Closes a requests session when its worker thread disappears."""
+
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self._closed = False
+
+    def close(self) -> None:
+        if self._closed:
+            return
+
+        self._closed = True
+        self.session.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            # Destructors may run during interpreter shutdown.
+            pass
+
+
 class DeviceApiClient:
     def __init__(self, settings: AppSettings) -> None:
         self._settings = settings
         self._timeout = (5, 30)
         self._thread_local = local()
-        self._sessions: list[requests.Session] = []
+        self._session_owners: WeakSet[_ThreadSessionOwner] = WeakSet()
         self._sessions_lock = Lock()
 
     def heartbeat(self) -> HeartbeatResult:
-        response = self._session().post(
+        with self._session().post(
             self._url("/api/agent/heartbeat"),
             headers=self._headers(),
             json={"agentVersion": "signage-pyside-1.0.0"},
             timeout=self._timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
+        ) as response:
+            response.raise_for_status()
+            data = response.json()
 
         return HeartbeatResult(
             server_time=data.get("serverTimeUtc"),
@@ -46,13 +69,13 @@ class DeviceApiClient:
         )
 
     def get_assignment(self) -> AssignmentStatus:
-        response = self._session().get(
+        with self._session().get(
             self._url("/api/agent/assignment"),
             headers=self._headers(),
             timeout=self._timeout,
-        )
-        response.raise_for_status()
-        data = response.json()
+        ) as response:
+            response.raise_for_status()
+            data = response.json()
 
         return AssignmentStatus(
             has_assignment=bool(data.get("hasAssignment", False)),
@@ -62,22 +85,22 @@ class DeviceApiClient:
         )
 
     def get_manifest(self) -> dict[str, Any]:
-        response = self._session().get(
+        with self._session().get(
             self._url("/api/agent/manifest"),
             headers=self._headers(),
             timeout=self._timeout,
-        )
-        response.raise_for_status()
-        return response.json()
+        ) as response:
+            response.raise_for_status()
+            return response.json()
 
     def get_exchange_rates(self) -> dict[str, Any]:
-        response = self._session().get(
+        with self._session().get(
             self._url("/api/agent/exchange-rates"),
             headers=self._headers(),
             timeout=self._timeout,
-        )
-        response.raise_for_status()
-        payload = response.json()
+        ) as response:
+            response.raise_for_status()
+            payload = response.json()
 
         if not isinstance(payload, dict):
             raise ValueError("La respuesta de tasas no es un objeto JSON.")
@@ -85,13 +108,13 @@ class DeviceApiClient:
         return payload
 
     def get_weather(self) -> dict[str, Any]:
-        response = self._session().get(
+        with self._session().get(
             self._url("/api/agent/weather"),
             headers=self._headers(),
             timeout=self._timeout,
-        )
-        response.raise_for_status()
-        payload = response.json()
+        ) as response:
+            response.raise_for_status()
+            payload = response.json()
 
         if not isinstance(payload, dict):
             raise ValueError("La respuesta de clima no es un objeto JSON.")
@@ -99,13 +122,13 @@ class DeviceApiClient:
         return payload
 
     def get_references(self) -> dict[str, Any]:
-        response = self._session().get(
+        with self._session().get(
             self._url("/api/agent/references"),
             headers=self._headers(),
             timeout=self._timeout,
-        )
-        response.raise_for_status()
-        payload = response.json()
+        ) as response:
+            response.raise_for_status()
+            payload = response.json()
 
         if not isinstance(payload, dict):
             raise ValueError(
@@ -121,11 +144,16 @@ class DeviceApiClient:
             stream=True,
             timeout=self._timeout,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception:
+            response.close()
+            raise
+
         return response
 
     def report_sync(self, report: SyncReport) -> None:
-        response = self._session().post(
+        with self._session().post(
             self._url("/api/agent/sync-report"),
             headers=self._headers(),
             json={
@@ -139,37 +167,39 @@ class DeviceApiClient:
                 "deletedFilesCount": report.deleted_files_count,
             },
             timeout=self._timeout,
-        )
-        response.raise_for_status()
+        ) as response:
+            response.raise_for_status()
 
     def acknowledge_power_command(self, command_id: str) -> None:
         if not command_id.strip():
             raise ValueError("El identificador del comando es obligatorio.")
 
-        response = self._session().post(
+        with self._session().post(
             self._url("/api/agent/power-command/acknowledge"),
             headers=self._headers(),
             json={"commandId": command_id},
             timeout=self._timeout,
-        )
-        response.raise_for_status()
+        ) as response:
+            response.raise_for_status()
 
     def close(self) -> None:
         with self._sessions_lock:
-            sessions = tuple(self._sessions)
-            self._sessions.clear()
+            owners = tuple(self._session_owners)
+            self._session_owners.clear()
 
-        for session in sessions:
-            session.close()
+        for owner in owners:
+            owner.close()
 
     def _session(self) -> requests.Session:
         session = getattr(self._thread_local, "session", None)
 
         if session is None:
-            session = requests.Session()
+            owner = _ThreadSessionOwner()
+            session = owner.session
+            self._thread_local.owner = owner
             self._thread_local.session = session
             with self._sessions_lock:
-                self._sessions.append(session)
+                self._session_owners.add(owner)
 
         return session
 

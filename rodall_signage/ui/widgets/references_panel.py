@@ -319,7 +319,9 @@ class ReferencesPanel(QFrame):
         prepositive_keywords = (
             "PREVIO",
             "AUTORIZ",
-            "CONCLUID"
+            "CONCLUID",
+            "REVISAD",
+            "PROFORMA REVISAD"
         )
         negative_keywords = (
             "PEND",
