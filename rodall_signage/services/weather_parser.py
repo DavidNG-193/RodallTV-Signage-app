@@ -53,6 +53,7 @@ def parse_weather_snapshot(payload: dict[str, Any]) -> WeatherSnapshot:
             relative_humidity_percent=None,
             precipitation_mm=None,
             weather_code=None,
+            display_weather_code=None,
             description=None,
             wind_speed_kmh=None,
             observation_time=None,
@@ -66,6 +67,7 @@ def parse_weather_snapshot(payload: dict[str, Any]) -> WeatherSnapshot:
     description = payload.get("description")
     humidity = payload.get("relativeHumidityPercent")
     weather_code = payload.get("weatherCode")
+    display_weather_code = payload.get("displayWeatherCode", weather_code)
     if not isinstance(location_name, str) or not location_name.strip():
         raise ValueError("El clima no contiene locationName.")
     if not isinstance(description, str) or not description.strip():
@@ -74,6 +76,10 @@ def parse_weather_snapshot(payload: dict[str, Any]) -> WeatherSnapshot:
         raise ValueError("La humedad debe estar entre 0 y 100.")
     if type(weather_code) is not int or weather_code < 0:
         raise ValueError("weatherCode debe ser un entero no negativo.")
+    if type(display_weather_code) is not int or display_weather_code < 0:
+        raise ValueError(
+            "displayWeatherCode debe ser un entero no negativo."
+        )
 
     precipitation = _finite_number(payload, "precipitationMm")
     wind = _finite_number(payload, "windSpeedKmh")
@@ -94,6 +100,7 @@ def parse_weather_snapshot(payload: dict[str, Any]) -> WeatherSnapshot:
         relative_humidity_percent=humidity,
         precipitation_mm=precipitation,
         weather_code=weather_code,
+        display_weather_code=display_weather_code,
         description=description.strip(),
         wind_speed_kmh=wind,
         observation_time=_local_datetime(payload.get("observationTime")),

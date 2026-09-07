@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import platform
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,12 +59,13 @@ def _read_positive_int(name: str, default: int) -> int:
 
 
 def _build_ipc_endpoint() -> tuple[str, str]:
-    name = os.getenv("RODALL_IPC_NAME", "rodalltv-mpv").strip()
+    base_name = os.getenv("RODALL_IPC_NAME", "rodalltv-mpv").strip()
+    name = f"{base_name}-{os.getpid()}"
 
     if platform.system() == "Windows":
         return rf"\\.\pipe\{name}", name
 
-    socket_path = str(Path(tempfile.gettempdir()) / f"{name}.sock")
+    socket_path = str(RUNTIME_DIR / f"{name}.sock")
     return socket_path, socket_path
 
 
@@ -153,7 +153,7 @@ class AppSettings:
             content_dir=RUNTIME_DIR / "content",
             manifest_path=CACHE_DIR / "active_manifest.json",
             exchange_rate_refresh_seconds=max(
-                _read_positive_int("RODALL_EXCHANGE_RATE_SECONDS", 3600),
+                _read_positive_int("RODALL_EXCHANGE_RATE_SECONDS", 900),
                 300,
             ),
             weather_refresh_seconds=max(

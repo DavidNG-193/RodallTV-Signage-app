@@ -128,7 +128,7 @@ class WeatherCard(QFrame):
             if snapshot.wind_speed_kmh is not None
             else "Viento: --"
         )
-        self._set_icon(snapshot.weather_code)
+        self._set_icon(snapshot.display_weather_code)
         self._update_availability()
 
     def set_weather(self, weather: WeatherSnapshot | None) -> None:
@@ -178,7 +178,7 @@ class WeatherCard(QFrame):
         self._icon_size = icon_size
         self._icon.setFixedSize(icon_size, icon_size)
         if self._snapshot is not None and self._snapshot.enabled:
-            self._set_icon(self._snapshot.weather_code)
+            self._set_icon(self._snapshot.display_weather_code)
 
     def _update_availability(self) -> None:
         if self._snapshot is None or not self._snapshot.enabled:

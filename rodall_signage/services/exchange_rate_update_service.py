@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Sequence
 
 from PySide6.QtCore import QObject, QThreadPool, QTimer, Signal, Slot
 
@@ -26,6 +26,7 @@ class ExchangeRateUpdateService(QObject):
         api_client: Any,
         store: Any,
         refresh_seconds: int,
+        retry_delays_seconds: Sequence[int] = (120, 300, 900),
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -33,6 +34,12 @@ class ExchangeRateUpdateService(QObject):
         self._api_client = api_client
         self._store = store
         self._refresh_seconds = max(refresh_seconds, 300)
+        self._retry_delays_seconds = tuple(
+            max(int(delay), 1) for delay in retry_delays_seconds
+        )
+        if not self._retry_delays_seconds:
+            raise ValueError("Debe configurarse al menos un tiempo de reintento.")
+        self._retry_attempt = 0
         self._thread_pool = QThreadPool(self)
         self._thread_pool.setMaxThreadCount(1)
         self._request_in_progress = False
@@ -42,6 +49,10 @@ class ExchangeRateUpdateService(QObject):
         self._timer = QTimer(self)
         self._timer.setInterval(self._refresh_seconds * 1000)
         self._timer.timeout.connect(self.refresh)
+
+        self._retry_timer = QTimer(self)
+        self._retry_timer.setSingleShot(True)
+        self._retry_timer.timeout.connect(self.refresh)
 
     def start(self) -> None:
         if self._running:
@@ -60,6 +71,7 @@ class ExchangeRateUpdateService(QObject):
     def stop(self) -> None:
         self._running = False
         self._timer.stop()
+        self._retry_timer.stop()
         self._thread_pool.clear()
         self._thread_pool.waitForDone(1000)
 
@@ -68,6 +80,7 @@ class ExchangeRateUpdateService(QObject):
         if not self._running or self._request_in_progress:
             return
 
+        self._retry_timer.stop()
         self._request_in_progress = True
 
         worker = ExchangeRateFetchWorker(self._api_client)
@@ -99,9 +112,14 @@ class ExchangeRateUpdateService(QObject):
             self.availability_changed.emit(
                 "stale" if snapshot.is_stale else "fresh"
             )
+            if snapshot.is_stale:
+                self._schedule_retry()
+            else:
+                self._reset_retry_schedule()
         except Exception:
             logger.exception("No fue posible procesar las tasas recibidas.")
             self._publish_cached_value()
+            self._schedule_retry()
         finally:
             self._request_in_progress = False
 
@@ -117,6 +135,27 @@ class ExchangeRateUpdateService(QObject):
         )
         self._publish_cached_value()
         self._request_in_progress = False
+        self._schedule_retry()
+
+    def _schedule_retry(self) -> None:
+        if not self._running:
+            return
+
+        retry_index = min(
+            self._retry_attempt,
+            len(self._retry_delays_seconds) - 1,
+        )
+        delay_seconds = self._retry_delays_seconds[retry_index]
+        self._retry_attempt += 1
+        self._retry_timer.start(delay_seconds * 1000)
+        logger.info(
+            "Siguiente reintento de tasas en %s segundos.",
+            delay_seconds,
+        )
+
+    def _reset_retry_schedule(self) -> None:
+        self._retry_attempt = 0
+        self._retry_timer.stop()
 
     def _publish_cached_value(self) -> None:
         result = self._store.read()

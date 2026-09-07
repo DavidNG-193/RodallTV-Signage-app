@@ -16,6 +16,9 @@ from rodall_signage.cache.cache_models import CacheFreshness
 from rodall_signage.services.exchange_rate_parser import (
     parse_exchange_rate_snapshot,
 )
+from rodall_signage.services.exchange_rate_update_service import (
+    ExchangeRateUpdateService,
+)
 from rodall_signage.stores.exchange_rate_store import ExchangeRateStore
 from rodall_signage.ui.widgets import ExchangeRateBar
 
@@ -156,6 +159,30 @@ class ExchangeRateModuleTests(unittest.TestCase):
         widget._advance_ticker_by(120)
 
         self.assertAlmostEqual(widget._offset, 5.0)
+
+    def test_update_service_uses_backoff_and_resets_after_success(self) -> None:
+        store = ExchangeRateStore(self.root / "exchange_rates.json")
+        service = ExchangeRateUpdateService(
+            object(),
+            store,
+            refresh_seconds=900,
+            retry_delays_seconds=(2, 5, 15),
+        )
+        service._running = True
+
+        service._on_failure("Error temporal")
+        self.assertTrue(service._retry_timer.isActive())
+        self.assertEqual(service._retry_timer.interval(), 2_000)
+
+        stale_payload = self._payload()
+        stale_payload["isStale"] = True
+        service._on_success(stale_payload)
+        self.assertEqual(service._retry_timer.interval(), 5_000)
+
+        service._on_success(self._payload())
+        self.assertFalse(service._retry_timer.isActive())
+        self.assertEqual(service._retry_attempt, 0)
+        service.stop()
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ def weather_payload(*, stale: bool = False) -> dict:
         "relativeHumidityPercent": 78,
         "precipitationMm": 0,
         "weatherCode": 2,
+        "displayWeatherCode": 2,
         "description": "Parcialmente nublado",
         "windSpeedKmh": 13.2,
         "observationTime": "2026-08-07T09:15",
@@ -95,13 +96,59 @@ class WeatherModuleTests(unittest.TestCase):
 
     def test_weather_icons_without_png_keep_the_existing_symbol(self) -> None:
         snapshot = parse_weather_snapshot(
-            {**weather_payload(), "weatherCode": 71, "description": "Nieve"}
+            {
+                **weather_payload(),
+                "weatherCode": 71,
+                "displayWeatherCode": 71,
+                "description": "Nieve",
+            }
         )
         widget = WeatherCard()
         widget.set_snapshot(snapshot)
 
         self.assertEqual(widget._icon.text(), "❄")
         self.assertTrue(widget._icon.pixmap().isNull())
+
+    def test_widget_uses_display_code_and_preserves_provider_code(self) -> None:
+        snapshot = parse_weather_snapshot(
+            {
+                **weather_payload(),
+                "weatherCode": 95,
+                "displayWeatherCode": 2,
+                "description": "Posible tormenta",
+            }
+        )
+        widget = WeatherCard()
+        widget.set_snapshot(snapshot)
+
+        self.assertEqual(snapshot.weather_code, 95)
+        self.assertEqual(widget._condition.text(), "Posible tormenta")
+        self.assertFalse(widget._icon.pixmap().isNull())
+
+    def test_widget_can_present_uncertain_drizzle_as_cloudiness(self) -> None:
+        snapshot = parse_weather_snapshot(
+            {
+                **weather_payload(),
+                "weatherCode": 51,
+                "displayWeatherCode": 2,
+                "description": "Posible llovizna",
+            }
+        )
+        widget = WeatherCard()
+        widget.set_snapshot(snapshot)
+
+        self.assertEqual(snapshot.weather_code, 51)
+        self.assertEqual(snapshot.display_weather_code, 2)
+        self.assertEqual(widget._condition.text(), "Posible llovizna")
+        self.assertFalse(widget._icon.pixmap().isNull())
+
+    def test_parser_keeps_compatibility_with_previous_responses(self) -> None:
+        payload = weather_payload()
+        payload.pop("displayWeatherCode")
+
+        snapshot = parse_weather_snapshot(payload)
+
+        self.assertEqual(snapshot.display_weather_code, snapshot.weather_code)
 
     def test_disabled_weather_is_a_valid_empty_state(self) -> None:
         snapshot = parse_weather_snapshot({"enabled": False})

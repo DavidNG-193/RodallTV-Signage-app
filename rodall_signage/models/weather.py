@@ -16,6 +16,7 @@ class WeatherSnapshot:
     relative_humidity_percent: int | None
     precipitation_mm: float | None
     weather_code: int | None
+    display_weather_code: int | None
     description: str | None
     wind_speed_kmh: float | None
     observation_time: datetime | None

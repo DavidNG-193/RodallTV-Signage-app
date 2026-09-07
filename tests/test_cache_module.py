@@ -95,6 +95,7 @@ class CacheModuleTests(unittest.TestCase):
             relative_humidity_percent=76,
             precipitation_mm=0,
             weather_code=2,
+            display_weather_code=2,
             description="Parcialmente nublado",
             wind_speed_kmh=18,
             observation_time=datetime(2026, 8, 7, 9, 0),

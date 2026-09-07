@@ -64,6 +64,7 @@ class WeatherStore:
             "relativeHumidityPercent": snapshot.relative_humidity_percent,
             "precipitationMm": snapshot.precipitation_mm,
             "weatherCode": snapshot.weather_code,
+            "displayWeatherCode": snapshot.display_weather_code,
             "description": snapshot.description,
             "windSpeedKmh": snapshot.wind_speed_kmh,
             "observationTime": (
@@ -92,6 +93,7 @@ class WeatherStore:
                 relative_humidity_percent=None,
                 precipitation_mm=None,
                 weather_code=None,
+                display_weather_code=None,
                 description=None,
                 wind_speed_kmh=None,
                 observation_time=None,
@@ -114,6 +116,10 @@ class WeatherStore:
         wind = WeatherStore._required_number(payload, "windSpeedKmh")
         humidity = payload.get("relativeHumidityPercent")
         weather_code = payload.get("weatherCode")
+        display_weather_code = payload.get(
+            "displayWeatherCode",
+            weather_code,
+        )
 
         if type(humidity) is not int or not 0 <= humidity <= 100:
             raise ValueError(
@@ -121,6 +127,10 @@ class WeatherStore:
             )
         if type(weather_code) is not int or weather_code < 0:
             raise ValueError("weatherCode debe ser un entero no negativo.")
+        if type(display_weather_code) is not int or display_weather_code < 0:
+            raise ValueError(
+                "displayWeatherCode debe ser un entero no negativo."
+            )
         if precipitation < 0 or wind < 0:
             raise ValueError("Precipitación y viento no pueden ser negativos.")
 
@@ -135,6 +145,7 @@ class WeatherStore:
             relative_humidity_percent=humidity,
             precipitation_mm=precipitation,
             weather_code=weather_code,
+            display_weather_code=display_weather_code,
             description=description,
             wind_speed_kmh=wind,
             observation_time=WeatherStore._parse_local(

@@ -164,17 +164,32 @@ class ReferenceModuleTests(unittest.TestCase):
                 "status": "PREVIO CONCLUIDO",
             }
         )
+        billed = positive.__class__(
+            **{
+                **{
+                    field: getattr(positive, field)
+                    for field in positive.__dataclass_fields__
+                },
+                "status_code": "G",
+                "status": "CUENTA DE GASTOS",
+            }
+        )
 
         self.assertEqual(
             ReferencesPanel._status_object_name(delivered),
-            "statusPositive",
+            "statusPrePositive",
         )
         self.assertEqual(
             ReferencesPanel._status_object_name(concluded),
             "statusPrePositive",
         )
-        self.assertTrue(ReferencesPanel._is_concluded(delivered))
+        self.assertFalse(ReferencesPanel._is_concluded(delivered))
         self.assertFalse(ReferencesPanel._is_concluded(concluded))
+        self.assertEqual(
+            ReferencesPanel._status_object_name(billed),
+            "statusPositive",
+        )
+        self.assertTrue(ReferencesPanel._is_concluded(billed))
         self.assertFalse(ReferencesPanel._is_concluded(negative))
         self.assertEqual(
             ReferencesPanel._status_object_name(negative),
@@ -227,11 +242,22 @@ class ReferenceModuleTests(unittest.TestCase):
                     "status": "PREVIO CONCLUIDO",
                 }
             ),
+            original.__class__(
+                **{
+                    **{
+                        field: getattr(original, field)
+                        for field in original.__dataclass_fields__
+                    },
+                    "reference_number": "VER26-01236",
+                    "status_code": "G",
+                    "status": "CUENTA DE GASTOS",
+                }
+            ),
         ]
         panel = ReferencesPanel()
         panel.set_references(references)
 
-        self.assertEqual(panel._count_label.text(), "2  -  1 concluidas")
+        self.assertEqual(panel._count_label.text(), "3  -  1 concluidas")
 
     def test_scroll_restarts_at_real_scrollbar_limit(self) -> None:
         panel = ReferencesPanel()

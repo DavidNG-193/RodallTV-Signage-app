@@ -179,8 +179,8 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         font-weight: 800;
     }}
     QLabel#operationExport {{
-        color: #d8dde2;
-        background: #292b2d;
+        color: #352b17;
+        background: #f1c75b;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;

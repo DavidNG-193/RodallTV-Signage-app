@@ -309,14 +309,15 @@ class ReferencesPanel(QFrame):
         normalized = f"{reference.status_code} {reference.status}".upper()
 
         positive_keywords = (
+            "CUENTA DE GASTOS",
+        )
+        prepositive_keywords = (
             "DESPACH",
             "LIBER",
             "ENTREG",
             "COMPLET",
             "VALIDA",
-            "FINALIZ"
-        )
-        prepositive_keywords = (
+            "FINALIZ",
             "PREVIO",
             "AUTORIZ",
             "CONCLUID",
@@ -327,7 +328,8 @@ class ReferencesPanel(QFrame):
             "PEND",
             "RECHAZ",
             "ERROR",
-            "CANCEL",
+            "CANCELADO",
+            "CANCELADA",
             "BLOQUE",
             "FALTA",
             "VENC",
