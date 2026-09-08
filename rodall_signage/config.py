@@ -19,20 +19,9 @@ _BUNDLED_MPV = PROJECT_ROOT / (
 
 
 def _load_environment_files() -> None:
-    # La ubicación oficial es signage-app/.env. Se conserva compatibilidad
-    # con rodall_signage/.env porque algunas instalaciones iniciales en
-    # Raspberry recibieron el archivo dentro del paquete.
-    candidates = (
-        PROJECT_ROOT / ".env",
-        Path(__file__).resolve().parent / ".env",
-        # Fallback de migración: reutiliza las credenciales ya provisionadas
-        # por el agente anterior sin copiarlas al código ni versionarlas.
-        PROJECT_ROOT.parent / "raspberry-agent" / ".env",
-    )
-
-    for path in candidates:
-        if path.is_file():
-            load_dotenv(dotenv_path=path, override=False)
+    environment_file = PROJECT_ROOT / ".env"
+    if environment_file.is_file():
+        load_dotenv(dotenv_path=environment_file, override=False)
 
 
 def _read_bool(name: str, default: bool) -> bool:
