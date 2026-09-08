@@ -322,7 +322,9 @@ class ReferencesPanel(QFrame):
             "AUTORIZ",
             "CONCLUID",
             "REVISAD",
-            "PROFORMA REVISAD"
+            "COVE",
+            "OPERACION",
+            "PROFORMA REVISAD",
         )
         negative_keywords = (
             "PEND",
