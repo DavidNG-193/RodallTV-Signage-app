@@ -3,13 +3,16 @@
 Esta guía sirve para el escenario donde la Raspberry no se conecta o no
 sincroniza contenido después de cambiar la dirección del servidor, iniciar una
 nueva base de datos Docker o modificar las credenciales del dispositivo.
+En la instalacion de produccion HTTP, usar `rodalltv.rodall`, que debe resolver
+a `10.11.20.40` desde la Raspberry.
 
 ## 1. Comprobar la conectividad básica
 
 Desde la Raspberry, consulta el health check del servidor:
 
 ```bash
-curl http://IP_O_DOMINIO_DEL_SERVIDOR:8080/health/ready
+getent hosts rodalltv.rodall
+curl http://rodalltv.rodall:8080/health/ready
 ```
 
 La respuesta esperada es:
@@ -28,8 +31,8 @@ Si no responde, verifica que:
 
 En el servidor se puede consultar el estado con:
 
-```powershell
-docker compose ps --all
+```bash
+sudo docker compose ps --all
 ```
 
 ## 2. Modificar el archivo de configuración correcto
@@ -52,7 +55,7 @@ sudo nano /etc/rodalltv/signage.env
 Comprueba que tenga la dirección y las credenciales vigentes:
 
 ```env
-RODALL_API_BASE_URL=http://IP_O_DOMINIO_DEL_SERVIDOR:8080
+RODALL_API_BASE_URL=http://rodalltv.rodall:8080
 RODALL_DEVICE_ID=ID_DEL_DISPOSITIVO
 RODALL_DEVICE_TOKEN=TOKEN_DEL_DISPOSITIVO
 ```
@@ -159,7 +162,7 @@ Cada `downloadUrl` debe contener el dominio o IP correctos y el puerto `8080`
 cuando se utilice HTTP local. Por ejemplo:
 
 ```text
-http://10.11.21.17:8080/api/agent/media/ID/download
+http://rodalltv.rodall:8080/api/agent/media/ID/download
 ```
 
 Si falta `:8080`, confirma que Nginx use `$http_host` en los encabezados `Host`
