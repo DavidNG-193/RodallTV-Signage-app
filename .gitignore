@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+runtime/cache/*
+runtime/content/*
+runtime/logs/*
+!runtime/cache/.gitkeep
+!runtime/content/.gitkeep
+!runtime/logs/.gitkeep
+
+.DS_Store
+Thumbs.db
+.vscode/
