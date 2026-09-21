@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import unicodedata
+
 from PySide6.QtCore import QElapsedTimer, QTimer, Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
@@ -25,6 +27,53 @@ class ReferencesPanel(QFrame):
     _ROW_SPACING = 7
     _FRAME_INTERVAL_MS = 34
     _SCROLL_SPEED_PX_PER_SECOND = 1000 / 34
+    _STATUS_STYLES = {
+        "ANTICIPO RECIBIDO": "statusBlue",
+        "ASESORIA": "statusBlue",
+        "AVERIA DEL VEHICULO": "statusRed",
+        "CANCELADO": "statusRed",
+        "CLASIFICADO": "statusCyan",
+        "COVE GENERADO": "statusPurple",
+        "COVE REALIZADO": "statusPurple",
+        "DESADUANADO O DESPACHADO": "statusGreen",
+        "DESCONSOLIDACION CONCLUIDA": "statusGreen",
+        "DESPACHADO - LIBRE": "statusGreen",
+        "DESPACHADO C/ RECONOCIMIENTO": "statusGreen",
+        "DESPACHADO DESCAMEX": "statusGreen",
+        "DESPACHADO LAG": "statusGreen",
+        "CUENTA DE GASTOS": "statusGreen",
+        "EN ABANDONO": "statusRed",
+        "EN ESPERA DE ANTICIPOS": "statusBlue",
+        "EN RUTA": "statusOrange",
+        "ETIQUETADO": "statusGray",
+        "ETIQUETADO CONCLUIDO": "statusGreen",
+        "FALTA CARTA GASTOS": "statusYellow",
+        "FALTA TALON FLETE": "statusYellow",
+        "FALTAN DOCUMENTOS": "statusYellow",
+        "HOY": "statusGray",
+        "JURIDICO": "statusRed",
+        "MERCANCIA CARGADA": "statusOrange",
+        "MERCANCIA ENTREGADA": "statusGreen",
+        "OPERACION TERMINADA": "statusGreen",
+        "OTROS (SE ESPECIFICA)": "statusGray",
+        "POR CLASIFICAR": "statusBlue",
+        "POR DESPACHAR": "statusOrange",
+        "POR FACTURARSE": "statusOrange",
+        "POR REVALIDAR": "statusCyan",
+        "PREVIO CONCLUIDO": "statusCyan",
+        "PROFORMA DE COVE": "statusPurple",
+        "PROFORMA DE FACTURA": "statusPurple",
+        "PROFORMA PEDIMENTO": "statusPurple",
+        "PROFORMA REVISADA": "statusCyan",
+        "PROGRAMADO A PREVIO": "statusPurple",
+        "PROGRAMADO A SEPARACION": "statusPurple",
+        "PROGRAMADO DESCONSOLIDACION": "statusPurple",
+        "PROGRAMADO ETIQUETADO": "statusPurple",
+        "REVALIDADO": "statusCyan",
+        "SE REGRESA A EJECUTIVA": "statusYellow",
+        "SEPARACION CONCLUIDA": "statusGreen",
+        "VALIDADO": "statusGreen",
+    }
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -306,45 +355,19 @@ class ReferencesPanel(QFrame):
 
     @staticmethod
     def _status_object_name(reference: ReferenceItem) -> str:
-        normalized = f"{reference.status_code} {reference.status}".upper()
+        normalized = ReferencesPanel._normalize_status(reference.status)
+        return ReferencesPanel._STATUS_STYLES.get(normalized, "statusGray")
 
-        positive_keywords = (
-            "CUENTA DE GASTOS",
+    @staticmethod
+    def _normalize_status(status: str) -> str:
+        decomposed = unicodedata.normalize("NFKD", status)
+        without_accents = "".join(
+            character
+            for character in decomposed
+            if not unicodedata.combining(character)
         )
-        prepositive_keywords = (
-            "DESPACH",
-            "LIBER",
-            "ENTREG",
-            "COMPLET",
-            "VALIDA",
-            "FINALIZ",
-            "PREVIO",
-            "AUTORIZ",
-            "CONCLUID",
-            "REVISAD",
-            "COVE",
-            "OPERACION",
-            "PROFORMA REVISAD",
-        )
-        negative_keywords = (
-            "PEND",
-            "RECHAZ",
-            "ERROR",
-            "CANCELADO",
-            "CANCELADA",
-            "BLOQUE",
-            "FALTA",
-            "VENC",
-        )
-
-        if any(keyword in normalized for keyword in positive_keywords):
-            return "statusPositive"
-        if any(keyword in normalized for keyword in prepositive_keywords):
-            return "statusPrePositive"
-        if any(keyword in normalized for keyword in negative_keywords):
-            return "statusNegative"
-        return "statusNeutral"
+        return " ".join(without_accents.upper().split())
 
     @staticmethod
     def _is_concluded(reference: ReferenceItem) -> bool:
-        return ReferencesPanel._status_object_name(reference) == "statusPositive"
+        return ReferencesPanel._status_object_name(reference) == "statusGreen"

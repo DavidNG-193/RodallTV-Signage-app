@@ -17,6 +17,8 @@ from rodall_signage.services.reference_update_service import (
     ReferenceUpdateService,
 )
 from rodall_signage.stores.reference_store import ReferenceStore
+from rodall_signage.ui.responsive import metrics_for_width
+from rodall_signage.ui.theme import build_stylesheet
 from rodall_signage.ui.widgets.references_panel import ReferencesPanel
 
 
@@ -122,87 +124,125 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertTrue(raw["generatedAt"].endswith("Z"))
         self.assertFalse(self.store.path.with_suffix(".json.tmp").exists())
 
-    def test_status_tones_are_semantic_and_layout_widths_are_stable(self) -> None:
+    def test_status_palette_matches_business_classification(self) -> None:
         positive = parse_reference_snapshot(payload()).references[0]
-        negative = positive.__class__(
+        expected_groups = {
+            "statusBlue": (
+                "ANTICIPO RECIBIDO", "ASESORIA", "EN ESPERA DE ANTICIPOS",
+                "POR CLASIFICAR",
+            ),
+            "statusRed": (
+                "AVERIA DEL VEHICULO", "CANCELADO", "EN ABANDONO", "JURIDICO",
+            ),
+            "statusCyan": (
+                "CLASIFICADO", "POR REVALIDAR", "PREVIO CONCLUIDO",
+                "PROFORMA REVISADA", "REVALIDADO",
+            ),
+            "statusPurple": (
+                "COVE GENERADO", "COVE REALIZADO", "PROFORMA DE COVE",
+                "PROFORMA DE FACTURA", "PROFORMA PEDIMENTO",
+                "PROGRAMADO A PREVIO", "PROGRAMADO A SEPARACION",
+                "PROGRAMADO DESCONSOLIDACION", "PROGRAMADO ETIQUETADO",
+            ),
+            "statusGreen": (
+                "DESADUANADO O DESPACHADO", "DESCONSOLIDACION CONCLUIDA",
+                "DESPACHADO - LIBRE", "DESPACHADO C/ RECONOCIMIENTO",
+                "DESPACHADO DESCAMEX", "DESPACHADO LAG", "CUENTA DE GASTOS",
+                "ETIQUETADO CONCLUIDO", "MERCANCIA ENTREGADA",
+                "OPERACION TERMINADA", "SEPARACION CONCLUIDA", "VALIDADO",
+            ),
+            "statusOrange": (
+                "EN RUTA", "MERCANCIA CARGADA", "POR DESPACHAR",
+                "POR FACTURARSE",
+            ),
+            "statusGray": ("ETIQUETADO", "HOY", "OTROS (SE ESPECIFICA)"),
+            "statusYellow": (
+                "FALTA CARTA GASTOS", "FALTA TALON FLETE",
+                "FALTAN DOCUMENTOS", "SE REGRESA A EJECUTIVA",
+            ),
+        }
+
+        for object_name, statuses in expected_groups.items():
+            for status_text in statuses:
+                reference = positive.__class__(
+                    **{
+                        **{
+                            field: getattr(positive, field)
+                            for field in positive.__dataclass_fields__
+                        },
+                        "status": status_text,
+                    }
+                )
+                with self.subTest(status=status_text):
+                    self.assertEqual(
+                        ReferencesPanel._status_object_name(reference),
+                        object_name,
+                    )
+                    self.assertEqual(
+                        ReferencesPanel._is_concluded(reference),
+                        object_name == "statusGreen",
+                    )
+
+        accented = positive.__class__(
             **{
                 **{
                     field: getattr(positive, field)
                     for field in positive.__dataclass_fields__
                 },
-                "status_code": "P",
-                "status": "PENDIENTE DE DOCUMENTOS",
+                "status": "  asesoría  ",
             }
         )
-        neutral = positive.__class__(
+        unknown = positive.__class__(
             **{
                 **{
                     field: getattr(positive, field)
                     for field in positive.__dataclass_fields__
                 },
-                "status_code": "T",
-                "status": "EN TRÁMITE",
+                "status": "ESTADO NUEVO",
             }
         )
-        delivered = positive.__class__(
-            **{
-                **{
-                    field: getattr(positive, field)
-                    for field in positive.__dataclass_fields__
-                },
-                "status_code": "D",
-                "status": "DESPACHADO",
-            }
+        self.assertEqual(
+            ReferencesPanel._status_object_name(accented), "statusBlue"
         )
-        concluded = positive.__class__(
-            **{
-                **{
-                    field: getattr(positive, field)
-                    for field in positive.__dataclass_fields__
-                },
-                "status_code": "C",
-                "status": "PREVIO CONCLUIDO",
-            }
-        )
-        billed = positive.__class__(
-            **{
-                **{
-                    field: getattr(positive, field)
-                    for field in positive.__dataclass_fields__
-                },
-                "status_code": "G",
-                "status": "CUENTA DE GASTOS",
-            }
+        self.assertEqual(
+            ReferencesPanel._status_object_name(unknown), "statusGray"
         )
 
-        self.assertEqual(
-            ReferencesPanel._status_object_name(delivered),
-            "statusPrePositive",
-        )
-        self.assertEqual(
-            ReferencesPanel._status_object_name(concluded),
-            "statusPrePositive",
-        )
-        self.assertFalse(ReferencesPanel._is_concluded(delivered))
-        self.assertFalse(ReferencesPanel._is_concluded(concluded))
-        self.assertEqual(
-            ReferencesPanel._status_object_name(billed),
-            "statusPositive",
-        )
-        self.assertTrue(ReferencesPanel._is_concluded(billed))
-        self.assertFalse(ReferencesPanel._is_concluded(negative))
-        self.assertEqual(
-            ReferencesPanel._status_object_name(negative),
-            "statusNegative",
-        )
-        self.assertEqual(
-            ReferencesPanel._status_object_name(neutral),
-            "statusNeutral",
+    def test_status_palette_uses_requested_hex_colors(self) -> None:
+        stylesheet = build_stylesheet(metrics_for_width(1280))
+        expected_colors = {
+            "statusBlue": "#2563EB",
+            "statusRed": "#DC2626",
+            "statusCyan": "#0891B2",
+            "statusPurple": "#7C3AED",
+            "statusGreen": "#16A34A",
+            "statusOrange": "#F59E0B",
+            "statusGray": "#64748B",
+            "statusYellow": "#EAB308",
+        }
+
+        for object_name, color in expected_colors.items():
+            with self.subTest(object_name=object_name):
+                selector_start = stylesheet.index(f"QLabel#{object_name} {{")
+                selector_end = stylesheet.index("}", selector_start)
+                rule = stylesheet[selector_start:selector_end]
+                self.assertIn(f"background: {color};", rule)
+
+    def test_status_layout_widths_are_stable(self) -> None:
+        original = parse_reference_snapshot(payload()).references[0]
+        negative = original.__class__(
+            **{
+                **{
+                    field: getattr(original, field)
+                    for field in original.__dataclass_fields__
+                },
+                "status": "CANCELADO",
+            }
         )
 
         panel = ReferencesPanel()
         item = panel._build_reference_item(negative)
-        status = item.findChild(type(panel._count_label), "statusNegative")
+        status = item.findChild(type(panel._count_label), "statusRed")
         operation = item.findChild(type(panel._count_label), "operationImport")
         self.assertEqual(status.sizePolicy().horizontalPolicy().name, "Expanding")
         self.assertTrue(status.wordWrap())
@@ -218,7 +258,7 @@ class ReferenceModuleTests(unittest.TestCase):
         self.assertGreater(code.width(), panel._REFERENCE_WIDTH)
         self.assertGreater(operation.width(), panel._OPERATION_WIDTH)
 
-    def test_counter_excludes_prepositive_statuses(self) -> None:
+    def test_counter_counts_only_green_statuses(self) -> None:
         original = parse_reference_snapshot(payload()).references[0]
         references = [
             original.__class__(

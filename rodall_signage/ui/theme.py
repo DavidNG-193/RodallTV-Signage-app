@@ -186,37 +186,73 @@ def build_stylesheet(metrics: LayoutMetrics) -> str:
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusPrePositive {{
-        color: #61BBE2;
-        background: #0B2E3C;
-        border: 1px solid #19688A;
+    QLabel#statusBlue {{
+        color: #ffffff;
+        background: #2563EB;
+        border: 1px solid #2563EB;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusPositive {{
-        color: #61e295;
-        background: #123421;
-        border: 1px solid #276a43;
+    QLabel#statusRed {{
+        color: #ffffff;
+        background: #DC2626;
+        border: 1px solid #DC2626;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusNegative {{
-        color: #ff767b;
-        background: #3b1719;
-        border: 1px solid #762e32;
+    QLabel#statusCyan {{
+        color: #ffffff;
+        background: #0891B2;
+        border: 1px solid #0891B2;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
         font-weight: 800;
     }}
-    QLabel#statusNeutral {{
-        color: #d6d2ca;
-        background: #2a2926;
-        border: 1px solid #54514b;
+    QLabel#statusPurple {{
+        color: #ffffff;
+        background: #7C3AED;
+        border: 1px solid #7C3AED;
+        border-radius: 8px;
+        padding: 2px 7px;
+        font-size: {badge_text}px;
+        font-weight: 800;
+    }}
+    QLabel#statusGreen {{
+        color: #ffffff;
+        background: #16A34A;
+        border: 1px solid #16A34A;
+        border-radius: 8px;
+        padding: 2px 7px;
+        font-size: {badge_text}px;
+        font-weight: 800;
+    }}
+    QLabel#statusOrange {{
+        color: #1c1917;
+        background: #F59E0B;
+        border: 1px solid #F59E0B;
+        border-radius: 8px;
+        padding: 2px 7px;
+        font-size: {badge_text}px;
+        font-weight: 800;
+    }}
+    QLabel#statusGray {{
+        color: #ffffff;
+        background: #64748B;
+        border: 1px solid #64748B;
+        border-radius: 8px;
+        padding: 2px 7px;
+        font-size: {badge_text}px;
+        font-weight: 800;
+    }}
+    QLabel#statusYellow {{
+        color: #1c1917;
+        background: #EAB308;
+        border: 1px solid #EAB308;
         border-radius: 8px;
         padding: 2px 7px;
         font-size: {badge_text}px;
