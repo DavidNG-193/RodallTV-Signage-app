@@ -4,8 +4,8 @@ Esta guía instala RodallTV Signage en una Raspberry Pi dedicada y lo deja
 arrancando automáticamente a pantalla completa. Los comandos asumen:
 
 - Raspberry Pi 4 o 5 con Raspberry Pi OS de 64 bits **con escritorio**.
-- Un usuario local llamado `rodall`.
-- El repositorio clonado en `/home/rodall/signage-app`.
+- Un usuario local llamado `USUARIO`.
+- El repositorio clonado en `/home/USUARIO/RodallTV/signage-app`.
 - Una pantalla conectada por HDMI.
 - Acceso de red al backend de RodallTV.
 
@@ -15,7 +15,7 @@ arrancando automáticamente a pantalla completa. Los comandos asumen:
 ## 1. Preparar la Raspberry Pi
 
 Graba Raspberry Pi OS de 64 bits con escritorio mediante Raspberry Pi Imager.
-En las opciones avanzadas configura el usuario `rodall`, la red, la zona
+En las opciones avanzadas configura el usuario `USUARIO`, la red, la zona
 horaria y SSH si administrarás el equipo de forma remota.
 
 Después del primer arranque, abre una terminal y actualiza el sistema:
@@ -62,7 +62,7 @@ mpv --version
 ## 3. Descargar e instalar el agente
 
 ```bash
-cd /home/rodall/RodallTV
+cd /home/USUARIO/RodallTV
 git clone https://github.com/DavidNG-193/signage-app.git
 cd signage-app
 git lfs pull
@@ -120,19 +120,12 @@ RODALL_WEATHER_SECONDS=900
 RODALL_REFERENCE_SECONDS=60
 ```
 
-Protege el archivo:
-
-```bash
-sudo chown root:rodall /etc/rodalltv/signage.env
-sudo chmod 0640 /etc/rodalltv/signage.env
-```
-
 ## 6. Autorizar reinicio y apagado remotos
 
 El agente solo necesita permiso para las dos acciones declaradas en la regla:
 
 ```bash
-cd /home/rodall/RodallTV/signage-app
+cd /home/USUARIO/RodallTV/signage-app
 sudo install -o root -g root -m 0440 \
   deploy/rodall-power.sudoers \
   /etc/sudoers.d/rodall-power
@@ -161,12 +154,12 @@ After=network-online.target display-manager.service
 Type=simple
 User=rodall
 Group=rodall
-WorkingDirectory=/home/rodall/signage-app
+WorkingDirectory=/home/USUARIO/RodallTV/signage-app
 EnvironmentFile=/etc/rodalltv/signage.env
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/rodall/.Xauthority
+Environment=XAUTHORITY=/home/USUARIO/RodallTV/.Xauthority
 Environment=QT_QPA_PLATFORM=xcb
-ExecStart=/home/rodall/signage-app/.venv/bin/python /home/rodall/signage-app/main.py
+ExecStart=/home/USUARIO/RodallTV/signage-app/.venv/bin/python /home/USUARIO/RodallTV/signage-app/main.py
 Restart=always
 RestartSec=5
 TimeoutStopSec=15
@@ -188,7 +181,7 @@ Después de que aparezca el escritorio, revisa el estado:
 ```bash
 sudo systemctl status rodall-signage.service --no-pager
 sudo journalctl -u rodall-signage.service -n 100 --no-pager
-tail -n 100 /home/rodall/signage-app/runtime/logs/rodall-signage.log
+tail -n 100 /home/USUARIO/RodallTV/signage-app/runtime/logs/rodall-signage.log
 ```
 
 La aplicación debe ocupar la pantalla completa, registrar el heartbeat y
@@ -213,7 +206,7 @@ que se restauren después de cada reinicio.
 
 ```bash
 sudo systemctl stop rodall-signage.service
-cd /home/rodall/signage-app
+cd /home/USUARIO/RodallTV/signage-app
 git pull --ff-only
 git lfs pull
 .venv/bin/python -m pip install -r requirements-dev.txt
