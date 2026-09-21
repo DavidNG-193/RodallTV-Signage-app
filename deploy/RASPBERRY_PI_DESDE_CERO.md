@@ -62,7 +62,7 @@ mpv --version
 ## 3. Descargar e instalar el agente
 
 ```bash
-cd /home/rodall
+cd /home/rodall/RodallTV
 git clone https://github.com/DavidNG-193/signage-app.git
 cd signage-app
 git lfs pull
@@ -132,7 +132,7 @@ sudo chmod 0640 /etc/rodalltv/signage.env
 El agente solo necesita permiso para las dos acciones declaradas en la regla:
 
 ```bash
-cd /home/rodall/signage-app
+cd /home/rodall/RodallTV/signage-app
 sudo install -o root -g root -m 0440 \
   deploy/rodall-power.sudoers \
   /etc/sudoers.d/rodall-power
